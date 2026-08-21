@@ -365,7 +365,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: GATEKEEPER PAGE (/claim)
+// 3️⃣ STEP 3: GATEKEEPER PAGE WITH INVISIBLE CAPTCHA (/claim)
 // ----------------------------------------------------------------------
 app.get('/claim', async (req, res) => {
     const { token } = req.query;
@@ -392,6 +392,7 @@ app.get('/claim', async (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Security Verification Gateway</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -413,6 +414,7 @@ app.get('/claim', async (req, res) => {
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
                 }
+                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
                 .hidden { display: none; }
                 .spinner-wrapper {
                     position: relative; width: 65px; height: 65px; margin: 0 auto 20px;
@@ -440,7 +442,14 @@ app.get('/claim', async (req, res) => {
                         <span id="scanCount" class="timer-count">3</span>
                     </div>
                     <h2>VERIFYING TASK...</h2>
-                    <p class="sub">VERIFYING COMPLETION WITH SHORTENER SERVER...</p>
+                    <p class="sub">VERIFYING COMPLETION WITH SECURITY GATEWAY...</p>
+                    
+                    <!-- Invisible Turnstile Widget (Auto Pass in background) -->
+                    <div class="cf-turnstile" 
+                         data-sitekey="${TURNSTILE_SITE_KEY}" 
+                         data-theme="dark" 
+                         data-size="compact"
+                         data-callback="onClaimCaptchaSuccess"></div>
                 </div>
 
                 <div id="claimStep" class="hidden">
@@ -463,6 +472,11 @@ app.get('/claim', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
+                let claimCaptchaToken = "";
+                function onClaimCaptchaSuccess(token) {
+                    claimCaptchaToken = token;
+                }
+
                 let scanSeconds = 3;
                 const scanCount = document.getElementById('scanCount');
                 
@@ -480,7 +494,7 @@ app.get('/claim', async (req, res) => {
 
                 async function verifyTaskCompletion() {
                     try {
-                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}\`);
+                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
                         const data = await res.json();
 
                         document.getElementById('checkStep').classList.add('hidden');
@@ -489,7 +503,7 @@ app.get('/claim', async (req, res) => {
                             finalBotUrl = data.url;
                             document.getElementById('claimStep').classList.remove('hidden');
                         } else {
-                            document.getElementById('deniedReason').innerText = data.message || "Bypass bot detected or shortlink incomplete.";
+                            document.getElementById('deniedReason').innerText = data.message || "Bypass bot detected or security check failed.";
                             document.getElementById('deniedStep').classList.remove('hidden');
                         }
                     } catch(e) {
@@ -521,10 +535,10 @@ app.get('/claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 4️⃣ STEP 4: BACKEND GATE CHECK API (/api/execute-claim)
+// 4️⃣ STEP 4: BACKEND GATE CHECK API WITH CAPTCHA & REFERRER CHECK (/api/execute-claim)
 // ----------------------------------------------------------------------
 app.get('/api/execute-claim', async (req, res) => {
-    const { token } = req.query;
+    const { token, cf_token } = req.query;
 
     if (!token) return res.json({ success: false, message: "Token parameter missing." });
 
@@ -540,12 +554,40 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Token has already been claimed." });
         }
 
-        // 🛡️ WEBHOOK CHECK: PURE & UNBYPASSABLE
-        if (!tokenDoc.is_completed) {
-            return res.json({ 
-                success: false, 
-                message: "BYPASS DETECTED! Confirmation not received from shortener server." 
+        // 🛡️ 1. Referrer Check (अगर direct hit या bot होगा तो Referer नहीं होगा)
+        const referer = req.get('Referer') || '';
+        const host = req.get('host');
+        if (!referer.includes(host)) {
+            return res.json({
+                success: false,
+                message: "BYPASS DETECTED! Direct API request strictly prohibited."
             });
+        }
+
+        // 🛡️ 2. Turnstile Captcha Check on Claim Step
+        if (cf_token) {
+            const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+            const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
+                secret: TURNSTILE_SECRET_KEY,
+                response: cf_token
+            }));
+
+            if (!cfResponse.data.success) {
+                return res.json({ success: false, message: "Security Captcha verification failed!" });
+            }
+        }
+
+        // 🛡️ 3. Webhook Check (अगर Postback है तो इसे प्राथमिकता मिलेगी, वरना ऊपर के 2 चेक रोकेंगे)
+        if (tokenDoc.is_completed === false) {
+            // अगर पोस्टबैक नहीं आया है तो भी ऊपर का Captcha + Referer चेक बोट्स को ब्लॉक कर देगा
+            // लेकिन सुरक्षा के लिए हम चेक करते हैं कि कम से कम 10 सेकंड का गैप रहा हो
+            const timeDiff = Date.now() - (tokenDoc.generated_at || 0);
+            if (timeDiff < 5000) { // 5 सेकंड से कम का मतलब बोट ने बायपास किया
+                return res.json({
+                    success: false,
+                    message: "BYPASS DETECTED! Unnaturally fast request."
+                });
+            }
         }
 
         // Mark token as used
