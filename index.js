@@ -9,6 +9,10 @@ const MONGO_URI = process.env.MONGO_URI;
 // Database Name
 const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 
+// Cloudflare Turnstile Keys
+const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
+
 let db;
 
 // MongoDB Connection Helper
@@ -72,6 +76,8 @@ app.get('/verify', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Secure Verification</title>
+            <!-- Cloudflare Turnstile Script -->
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -86,7 +92,6 @@ app.get('/verify', async (req, res) => {
                     position: relative;
                 }
                 
-                /* 🌫️ Canvas for Fog Particles */
                 #fogCanvas {
                     position: absolute;
                     top: 0; left: 0;
@@ -103,15 +108,21 @@ app.get('/verify', async (req, res) => {
                     -webkit-backdrop-filter: blur(12px);
                     border: 1px solid rgba(255, 255, 255, 0.1);
                     border-radius: 16px;
-                    padding: 32px 24px;
+                    padding: 28px 20px;
                     text-align: center;
-                    width: 88%;
+                    width: 90%;
                     max-width: 380px;
                     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
                 }
 
                 h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; }
-                p.sub { color: #94a3b8; font-size: 13px; margin-bottom: 24px; text-transform: uppercase; }
+                p.sub { color: #94a3b8; font-size: 13px; margin-bottom: 18px; text-transform: uppercase; }
+
+                .turnstile-container {
+                    display: flex;
+                    justify-content: center;
+                    margin-bottom: 18px;
+                }
 
                 .btn {
                     background: #00d2ff;
@@ -147,7 +158,7 @@ app.get('/verify', async (req, res) => {
                 }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-                .status { margin-top: 15px; color: #38bdf8; font-size: 13px; }
+                .status { margin-top: 12px; color: #38bdf8; font-size: 13px; min-height: 18px; }
                 .timer-text { font-size: 12px; color: #64748b; margin-top: 15px; }
             </style>
         </head>
@@ -155,15 +166,21 @@ app.get('/verify', async (req, res) => {
             <canvas id="fogCanvas"></canvas>
 
             <div class="card">
-                <!-- STEP 1: INITIAL UI -->
+                <!-- STEP 1: CAPTCHA & INITIAL UI -->
                 <div id="step1">
                     <h2>SECURE VERIFICATION</h2>
                     <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK TO PROCEED. 🎴</p>
-                    <button id="vBtn" class="btn" onclick="processVerify()">VERIFY NOW</button>
-                    <div id="status" class="status"></div>
+                    
+                    <!-- Cloudflare Turnstile Widget -->
+                    <div class="turnstile-container">
+                        <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-theme="dark" data-callback="onCaptchaSuccess"></div>
+                    </div>
+
+                    <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY NOW</button>
+                    <div id="status" class="status">Please complete captcha above</div>
                 </div>
 
-                <!-- STEP 2: COUNTDOWN REDIRECT UI -->
+                <!-- STEP 2: 5s COUNTDOWN REDIRECT UI -->
                 <div id="step2" class="hidden">
                     <div id="loadingSpinner" class="spinner"></div>
                     <div id="checkIcon" class="checkmark">✓</div>
@@ -207,18 +224,31 @@ app.get('/verify', async (req, res) => {
                 }
                 animateParticles();
 
-                // 2. Token & Redirection Processing
+                // 2. Turnstile Callback
+                let turnstileResponseToken = "";
+                function onCaptchaSuccess(token) {
+                    turnstileResponseToken = token;
+                    document.getElementById('vBtn').disabled = false;
+                    document.getElementById('status').innerText = "";
+                }
+
+                // 3. Token & Verification Processing
                 let destinationUrl = "";
 
                 async function processVerify() {
+                    if (!turnstileResponseToken) {
+                        alert("Please complete the Captcha check!");
+                        return;
+                    }
+
                     const btn = document.getElementById('vBtn');
                     const status = document.getElementById('status');
                     btn.disabled = true;
                     btn.innerText = "INITIALIZING...";
-                    status.innerText = "Generating link, please wait...";
+                    status.innerText = "Validating security check...";
 
                     try {
-                        const res = await fetch('/api/process-token?token=${cleanToken}');
+                        const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
                         const data = await res.json();
                         
                         if(data.success && data.url) {
@@ -226,15 +256,17 @@ app.get('/verify', async (req, res) => {
                             startCountdown();
                         } else {
                             alert(data.message || "Verification Failed!");
-                            btn.disabled = false;
+                            if (window.turnstile) window.turnstile.reset();
+                            btn.disabled = true;
                             btn.innerText = "VERIFY NOW";
-                            status.innerText = "";
+                            status.innerText = "Verification failed. Please retry captcha.";
                         }
                     } catch(e) {
                         alert("Network Error! Please try again.");
-                        btn.disabled = false;
+                        if (window.turnstile) window.turnstile.reset();
+                        btn.disabled = true;
                         btn.innerText = "VERIFY NOW";
-                        status.innerText = "";
+                        status.innerText = "Network error. Please try again.";
                     }
                 }
 
@@ -275,16 +307,28 @@ app.get('/verify', async (req, res) => {
     }
 });
 
-// Single-Use Anti-Bypass API Endpoint
+// Single-Use Anti-Bypass API Endpoint with Turnstile Server Validation
 app.get('/api/process-token', async (req, res) => {
-    const { token } = req.query;
+    const { token, cf_token } = req.query;
 
     if (!token) return res.json({ success: false, message: "Token missing" });
+    if (!cf_token) return res.json({ success: false, message: "Captcha token missing" });
 
     try {
+        // 1. Verify Turnstile Token with Cloudflare Server
+        const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+        const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
+            secret: TURNSTILE_SECRET_KEY,
+            response: cf_token
+        }));
+
+        if (!cfResponse.data.success) {
+            return res.json({ success: false, message: "Security Captcha verification failed!" });
+        }
+
         const cleanToken = token.trim();
 
-        // Atomically find & delete token
+        // 2. Atomically find & delete token from MongoDB
         const result = await db.collection('verify_tokens').findOneAndDelete({ 
             token: cleanToken, 
             is_used: false 
@@ -296,14 +340,13 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // Fetch settings from 'settings' collection and '_id: bot_settings'
+        // Fetch settings from DB
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
 
         if (!settings || !settings.shortlink_url || !settings.shortlink_api) {
             return res.json({ success: false, message: "Shortener configuration missing in Database." });
         }
 
-        // Handles bot username automatically (strips '@' if present)
         let rawBotUsername = settings.bot_username || "SmartfilestorebyAcbot";
         const botUsername = rawBotUsername.replace(/^@/, '');
 
@@ -321,7 +364,7 @@ app.get('/api/process-token', async (req, res) => {
         }
     } catch (err) {
         console.error("API Error:", err);
-        return res.json({ success: false, message: "Shortener API Connection Error." });
+        return res.json({ success: false, message: "Server Verification Error." });
     }
 });
 
