@@ -11,6 +11,8 @@ const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
+
+// 🔐 Postback Secret Key
 const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "Zender_Secret_Pass_8921";
 
 let db;
@@ -510,7 +512,7 @@ app.get('/claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK
+// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK (STRICT POSTBACK CHECK)
 // ----------------------------------------------------------------------
 app.get('/api/execute-claim', async (req, res) => {
     const { token, hash, cf_token } = req.query;
@@ -525,19 +527,28 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        // 🛡️ 1. HMAC Gate Hash Validation
+        // 🚨 1. POSTBACK CHECK (शॉर्टलिंक कम्प्लीशन वेरिफिकेशन)
+        // यदि एडमिन/शॉर्टलिंक साइट से पोस्टबैक नहीं आया है तो सीधे ब्लॉक कर दें!
+        if (!tokenDoc.is_completed) {
+            return res.json({ 
+                success: false, 
+                message: "🚫 BYPASS DETECTED: Shortlink task was skipped or not completed via Official Site!" 
+            });
+        }
+
+        // 🛡️ 2. HMAC Gate Hash Validation
         const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
         if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
             return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
         }
 
-        // 🛡️ 2. Speed Check (3 सेकंड्स अंतर)
+        // 🛡️ 3. Minimum Time Gap Check (3 सेकंड्स सुरक्षा अंतर)
         const gateTimeDiff = Date.now() - (tokenDoc.gate_time || 0);
         if (gateTimeDiff < 3000) {
             return res.json({ success: false, message: "BYPASS DETECTED! Speed execution anomaly." });
         }
 
-        // 🛡️ 3. Turnstile Captcha Check
+        // 🛡️ 4. Cloudflare Turnstile Captcha Check
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
             secret: TURNSTILE_SECRET_KEY,
