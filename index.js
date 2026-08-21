@@ -123,6 +123,12 @@ function renderAccessDeniedUI(reasonText) {
     `;
 }
 
+// Access Denied Render Endpoint
+app.get('/access-denied', (req, res) => {
+    const reason = req.query.reason || "Shortlink task was skipped or security verification failed.";
+    res.send(renderAccessDeniedUI(reason));
+});
+
 // ----------------------------------------------------------------------
 // 1️⃣ STEP 1: INITIAL VERIFICATION PAGE (/verify)
 // ----------------------------------------------------------------------
@@ -215,13 +221,10 @@ app.get('/verify', async (req, res) => {
                                 window.location.href = data.url;
                             }
                         } else {
-                            alert(data.message || "Verification Failed!");
-                            if (window.turnstile) window.turnstile.reset();
-                            btn.disabled = true; btn.innerText = "VERIFY & CONTINUE";
+                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
                         }
                     } catch(e) {
-                        alert("Network Error!");
-                        btn.disabled = true; btn.innerText = "VERIFY & CONTINUE";
+                        window.location.href = "/access-denied?reason=Network Error";
                     }
                 }
             </script>
@@ -367,10 +370,10 @@ app.get('/gate', async (req, res) => {
                         if (data.success) {
                             window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
                         } else {
-                            alert(data.message || "Security Check Failed.");
+                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Check Failed")}\`;
                         }
                     } catch(e) {
-                        alert("Gate connection error.");
+                        window.location.href = "/access-denied?reason=Gate Connection Error";
                     }
                 }
             </script>
@@ -482,6 +485,10 @@ app.get('/claim', async (req, res) => {
                 }
 
                 async function executeClaim() {
+                    const btn = document.getElementById('claimBtn');
+                    btn.disabled = true;
+                    btn.innerText = "VERIFYING...";
+
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
                         const data = await res.json();
@@ -494,10 +501,11 @@ app.get('/claim', async (req, res) => {
                                 window.location.href = data.url;
                             }
                         } else {
-                            alert(data.message || "Security Verification Failed.");
+                            // 🚨 अब Alert की जगह सीधे UI Access Denied स्क्रीन पर रिडायरेक्ट करेगा!
+                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
                         }
                     } catch(e) {
-                        alert("Network verification error.");
+                        window.location.href = "/access-denied?reason=Network verification error";
                     }
                 }
             </script>
@@ -528,7 +536,6 @@ app.get('/api/execute-claim', async (req, res) => {
         }
 
         // 🚨 1. POSTBACK CHECK (शॉर्टलिंक कम्प्लीशन वेरिफिकेशन)
-        // यदि एडमिन/शॉर्टलिंक साइट से पोस्टबैक नहीं आया है तो सीधे ब्लॉक कर दें!
         if (!tokenDoc.is_completed) {
             return res.json({ 
                 success: false, 
@@ -542,7 +549,7 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
         }
 
-        // 🛡️ 3. Minimum Time Gap Check (3 सेकंड्स सुरक्षा अंतर)
+        // 🛡️ 3. Minimum Time Gap Check
         const gateTimeDiff = Date.now() - (tokenDoc.gate_time || 0);
         if (gateTimeDiff < 3000) {
             return res.json({ success: false, message: "BYPASS DETECTED! Speed execution anomaly." });
