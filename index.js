@@ -16,8 +16,7 @@ const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2Cr
 const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "Zender_Secret_Pass_8921";
 
 // ⚙️ POSTBACK REQUIREMENT FLAG:
-// Jab tak admin Postback URL add nahi karte, ise `false` rakhein taaki normal work kare.
-// Admin ke webhook add karne ke baad ise `true` kar dein.
+// Admin ke webhook setup hone tak `false` rakha hai
 const REQUIRE_POSTBACK = false; 
 
 let db;
@@ -186,16 +185,34 @@ app.get('/verify', async (req, res) => {
                     border-radius: 8px; cursor: pointer; width: 100%;
                 }
                 .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+                
+                /* 🚀 Loading HUD Animation Styles */
+                .loader-box { display: none; margin-top: 15px; }
+                .progress-bar {
+                    width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+                    border-radius: 4px; overflow: hidden; margin-top: 12px;
+                }
+                .fill { width: 0%; height: 100%; background: #00f3ff; transition: width 0.15s linear; }
+                .status-text { font-size: 12px; color: #00f3ff; font-weight: bold; letter-spacing: 1px; }
             </style>
         </head>
         <body>
             <div class="card">
                 <h2>SECURE VERIFICATION</h2>
                 <p class="sub">PLEASE COMPLETE THIS CHECK 🎴</p>
-                <div class="turnstile-container">
-                    <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onCaptchaSuccess"></div>
+
+                <div id="verify-form">
+                    <div class="turnstile-container">
+                        <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onCaptchaSuccess"></div>
+                    </div>
+                    <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY & CONTINUE</button>
                 </div>
-                <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY & CONTINUE</button>
+
+                <!-- 🔄 Redirecting Progress UI -->
+                <div id="loader" class="loader-box">
+                    <div class="status-text" id="statusText">INITIALIZING...</div>
+                    <div class="progress-bar"><div id="progress" class="fill"></div></div>
+                </div>
             </div>
 
             <script>
@@ -211,23 +228,43 @@ app.get('/verify', async (req, res) => {
                 }
 
                 async function processVerify() {
-                    const btn = document.getElementById('vBtn');
-                    btn.disabled = true; btn.innerText = "INITIALIZING...";
+                    // Turnstile UI छुपाकर Loading/Progress UI दिखाओ
+                    document.getElementById('verify-form').style.display = 'none';
+                    document.getElementById('loader').style.display = 'block';
+
+                    let percent = 0;
+                    const pBar = document.getElementById('progress');
+                    const sText = document.getElementById('statusText');
+
+                    const interval = setInterval(() => {
+                        percent += 10;
+                        pBar.style.width = percent + '%';
+                        if (percent >= 50 && percent < 90) {
+                            sText.innerText = "REDIRECTING...";
+                        }
+                        if (percent >= 100) {
+                            clearInterval(interval);
+                        }
+                    }, 100);
 
                     try {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
                         const data = await res.json();
                         
-                        if(data.success && data.url) {
-                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                                window.Telegram.WebApp.openLink(data.url);
-                                window.Telegram.WebApp.close();
+                        // Smooth Animation Complete hone ka wait karke redirect karo
+                        setTimeout(() => {
+                            if(data.success && data.url) {
+                                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                                    window.Telegram.WebApp.openLink(data.url);
+                                    window.Telegram.WebApp.close();
+                                } else {
+                                    window.location.href = data.url;
+                                }
                             } else {
-                                window.location.href = data.url;
+                                window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
                             }
-                        } else {
-                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
-                        }
+                        }, 1200);
+
                     } catch(e) {
                         window.location.href = "/access-denied?reason=Network Error";
                     }
