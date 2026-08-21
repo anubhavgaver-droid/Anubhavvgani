@@ -1,6 +1,7 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,7 +12,17 @@ const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
 
+// Enable Trust Proxy for platforms like Render, Heroku, Cloudflare
+app.set('trust proxy', 1);
+
 let db;
+
+// 🛡️ Rate Limiter: Protects endpoints from DDoS & Spam
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 Minute window
+    max: 30, // Limit each IP to 30 requests per minute
+    message: { success: false, message: "Too many requests. Please slow down." }
+});
 
 async function connectDB() {
     if (!db) {
@@ -27,6 +38,11 @@ async function connectDB() {
     return db;
 }
 
+// Helper: Extract real client IP
+function getClientIp(req) {
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+}
+
 // Keep-Alive / Health Check Routes
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
 app.get('/', (req, res) => res.status(200).send('Zender Proxy Server is Active'));
@@ -39,7 +55,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Pure English Access Denied HUD Template Helper
+// Access Denied HUD Template Helper
 function renderAccessDeniedUI(reasonText) {
     return `
     <!DOCTYPE html>
@@ -119,9 +135,9 @@ function renderAccessDeniedUI(reasonText) {
 }
 
 // ----------------------------------------------------------------------
-// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE
+// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE (/verify)
 // ----------------------------------------------------------------------
-app.get('/verify', async (req, res) => {
+app.get('/verify', apiLimiter, async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
@@ -344,9 +360,9 @@ app.get('/verify', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK & SAVE TIME
+// 2️⃣ STEP 2: GENERATE SHORTLINK & SAVE TIME + FINGERPRINT (IP/UA)
 // ----------------------------------------------------------------------
-app.get('/api/process-token', async (req, res) => {
+app.get('/api/process-token', apiLimiter, async (req, res) => {
     const { token, cf_token } = req.query;
 
     if (!token) return res.json({ success: false, message: "Token missing" });
@@ -370,10 +386,20 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // Record creation timestamp for 40-sec check
+        // Capture Client Fingerprint (IP & User-Agent)
+        const clientIp = getClientIp(req);
+        const userAgent = req.headers['user-agent'] || 'unknown';
+
+        // Save timestamp + fingerprint
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { generated_at: Date.now() } }
+            { 
+                $set: { 
+                    generated_at: Date.now(),
+                    created_ip: clientIp,
+                    created_ua: userAgent
+                } 
+            }
         );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
@@ -381,7 +407,6 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Shortener configuration missing." });
         }
 
-        // Target URL points to GATEKEEPER ENDPOINT (/claim)
         const hostUrl = req.protocol + '://' + req.get('host');
         const targetProxyUrl = `${hostUrl}/claim?token=${cleanToken}`;
 
@@ -404,7 +429,7 @@ app.get('/api/process-token', async (req, res) => {
 // ----------------------------------------------------------------------
 // 3️⃣ STEP 3: GATEKEEPER MINI APP PAGE (/claim)
 // ----------------------------------------------------------------------
-app.get('/claim', async (req, res) => {
+app.get('/claim', apiLimiter, async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
@@ -423,7 +448,6 @@ app.get('/claim', async (req, res) => {
             return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
         }
 
-        // Render Mini App UI for Claiming
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -487,7 +511,6 @@ app.get('/claim', async (req, res) => {
             <canvas id="fogCanvas"></canvas>
 
             <div class="card">
-                <!-- STEP 1: 5 SECONDS SECURITY CHECKING -->
                 <div id="checkStep">
                     <div class="spinner-wrapper">
                         <div class="spinner"></div>
@@ -497,7 +520,6 @@ app.get('/claim', async (req, res) => {
                     <p class="sub">PLEASE WAIT WHILE WE SCAN HUMAN INTERACTION TIME...</p>
                 </div>
 
-                <!-- STEP 2A: SUCCESS CLAIM BUTTON -->
                 <div id="claimStep" class="hidden">
                     <div class="checkmark" style="display:block;">✓</div>
                     <h2>VERIFICATION COMPLETE</h2>
@@ -505,7 +527,6 @@ app.get('/claim', async (req, res) => {
                     <button id="claimBtn" class="btn" onclick="executeClaim()">🎁 CLAIM YOUR TOKEN</button>
                 </div>
 
-                <!-- STEP 2B: BYPASS DETECTED DENIED -->
                 <div id="deniedStep" class="hidden">
                     <div class="denied-box">[ BYPASS BOT DETECTED ]</div>
                     <h2>ACCESS RESTRICTED</h2>
@@ -520,7 +541,6 @@ app.get('/claim', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
-                // Fog Particle Animation
                 const canvas = document.getElementById('fogCanvas');
                 const ctx = canvas.getContext('2d');
                 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -545,7 +565,6 @@ app.get('/claim', async (req, res) => {
                 }
                 animateParticles();
 
-                // 5-Seconds Scan Logic
                 let scanSeconds = 5;
                 const scanCount = document.getElementById('scanCount');
                 
@@ -555,13 +574,13 @@ app.get('/claim', async (req, res) => {
 
                     if (scanSeconds < 0) {
                         clearInterval(scanTimer);
-                        verify40SecGate();
+                        verifyMinTimeGate();
                     }
                 }, 1000);
 
                 let finalBotUrl = "";
 
-                async function verify40SecGate() {
+                async function verifyMinTimeGate() {
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}\`);
                         const data = await res.json();
@@ -604,15 +623,18 @@ app.get('/claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 4️⃣ STEP 4: BACKEND GATE CHECK API (/api/execute-claim)
+// 4️⃣ STEP 4: BACKEND GATE CHECK API (/api/execute-claim) - HARDENED
 // ----------------------------------------------------------------------
-app.get('/api/execute-claim', async (req, res) => {
+app.get('/api/execute-claim', apiLimiter, async (req, res) => {
     const { token } = req.query;
 
     if (!token) return res.json({ success: false, message: "Token parameter missing." });
 
     try {
         const cleanToken = token.trim();
+        const clientIp = getClientIp(req);
+
+        // Fetch token document
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
         if (!tokenDoc) {
@@ -623,22 +645,42 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Token has already been claimed." });
         }
 
-        const generatedAt = tokenDoc.generated_at || Date.now();
-        const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
-
-        // ⏱️ MINIMUM 40 SECONDS SECURITY CHECK
-        if (timeElapsedSeconds < 60) {
+        // 🛡️ SECURITY CHECK 1: Fingerprint (IP Verification)
+        if (tokenDoc.created_ip && tokenDoc.created_ip !== clientIp) {
             return res.json({ 
                 success: false, 
-                message: `BYPASS DETECTED! You completed verification in ${timeElapsedSeconds}s. Minimum required time is 40 seconds.` 
+                message: "SECURITY ALERT: Device/IP Mismatch detected! Bypass attempt blocked." 
             });
         }
 
-        // Mark token as used
-        await db.collection('verify_tokens').updateOne(
-            { token: cleanToken },
-            { $set: { is_used: true } }
+        // 🛡️ SECURITY CHECK 2: Minimum Elapsed Time Gate (60 Seconds)
+        const generatedAt = tokenDoc.generated_at || Date.now();
+        const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
+        const MIN_REQUIRED_SECONDS = 60;
+
+        if (timeElapsedSeconds < MIN_REQUIRED_SECONDS) {
+            return res.json({ 
+                success: false, 
+                message: `BYPASS DETECTED! You completed verification in ${timeElapsedSeconds}s. Minimum required time is ${MIN_REQUIRED_SECONDS} seconds.` 
+            });
+        }
+
+        // 🛡️ SECURITY CHECK 3: Atomic Lock (Prevents Race Condition / Double Claim)
+        const updateResult = await db.collection('verify_tokens').findOneAndUpdate(
+            { token: cleanToken, is_used: false },
+            { 
+                $set: { 
+                    is_used: true, 
+                    claimed_at: Date.now(),
+                    claimed_ip: clientIp 
+                } 
+            },
+            { returnDocument: 'after' }
         );
+
+        if (!updateResult) {
+            return res.json({ success: false, message: "Token has already been processed or claimed." });
+        }
 
         // Fetch Bot Username
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
