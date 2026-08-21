@@ -10,6 +10,7 @@ const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
+const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "MY_SUPER_SECRET_KEY_123";
 
 let db;
 
@@ -39,7 +40,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Pure English Access Denied HUD Template Helper
+// Access Denied HUD Template Helper
 function renderAccessDeniedUI(reasonText) {
     return `
     <!DOCTYPE html>
@@ -51,13 +52,9 @@ function renderAccessDeniedUI(reasonText) {
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
             :root {
-                --bg-color: #07090e;
-                --card-bg: rgba(13, 17, 23, 0.85);
-                --cyan-glow: #00f3ff;
-                --red-glow: #ff0055;
-                --red-dim: rgba(255, 0, 85, 0.15);
-                --text-main: #e6edf3;
-                --text-sub: #8b949e;
+                --bg-color: #07090e; --card-bg: rgba(13, 17, 23, 0.85);
+                --cyan-glow: #00f3ff; --red-glow: #ff0055; --red-dim: rgba(255, 0, 85, 0.15);
+                --text-main: #e6edf3; --text-sub: #8b949e;
             }
             * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
             body {
@@ -119,7 +116,7 @@ function renderAccessDeniedUI(reasonText) {
 }
 
 // ----------------------------------------------------------------------
-// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE
+// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE (/verify)
 // ----------------------------------------------------------------------
 app.get('/verify', async (req, res) => {
     const { token } = req.query;
@@ -146,10 +143,8 @@ app.get('/verify', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Secure Verification</title>
-            
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-            
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -162,53 +157,43 @@ app.get('/verify', async (req, res) => {
                 .card {
                     position: relative; z-index: 2;
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
-                    -webkit-backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
                     box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
                 h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; color: #fff; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; }
                 .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; }
                 .btn {
                     background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
-                    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
                 }
-                .btn:hover { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); transform: translateY(-1px); }
-                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
+                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
                 .hidden { display: none; }
-
                 .spinner-wrapper {
                     position: relative; width: 65px; height: 65px;
-                    margin: 0 auto 20px; display: flex;
-                    align-items: center; justify-content: center;
+                    margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
                 }
                 .spinner {
-                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                    position: absolute; width: 100%; height: 100%;
                     border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
                     border-radius: 50%; animation: spin 1s linear infinite;
                 }
                 .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
-                .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                .status { margin-top: 12px; color: #00f3ff; font-size: 13px; min-height: 18px; }
-                .timer-text { font-size: 12px; color: #64748b; margin-top: 15px; }
+                .status { margin-top: 12px; color: #00f3ff; font-size: 13px; }
             </style>
         </head>
         <body>
             <canvas id="fogCanvas"></canvas>
-
             <div class="card">
                 <div id="step1">
                     <h2>SECURE VERIFICATION</h2>
-                    <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK TO PROCEED 🎴</p>
-                    
+                    <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK 🎴</p>
                     <div class="turnstile-container">
                         <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-theme="dark" data-callback="onCaptchaSuccess"></div>
                     </div>
-
                     <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY NOW</button>
                     <div id="status" class="status">Please complete captcha above</div>
                 </div>
@@ -216,14 +201,10 @@ app.get('/verify', async (req, res) => {
                 <div id="step2" class="hidden">
                     <div id="spinnerWrapper" class="spinner-wrapper">
                         <div class="spinner"></div>
-                        <span id="timerCount" class="timer-count">5</span>
+                        <span id="timerCount" class="timer-count">3</span>
                     </div>
-
-                    <div id="checkIcon" class="checkmark">✓</div>
                     <h2>REDIRECTING...</h2>
-                    <p id="statusMsg" class="sub">PLEASE WAIT WHILE WE PREPARE YOUR DESTINATION LINK...</p>
-                    <button id="redirectBtn" class="btn hidden" onclick="goShortlink()">CLICK IF NOT REDIRECTED</button>
-                    <p class="timer-text">DO NOT CLOSE THIS WINDOW.</p>
+                    <p id="statusMsg" class="sub">PLEASE WAIT WHILE WE PREPARE DESTINATION...</p>
                 </div>
             </div>
 
@@ -240,25 +221,18 @@ app.get('/verify', async (req, res) => {
                 window.addEventListener('resize', resizeCanvas);
 
                 const particles = Array.from({ length: 60 }, () => ({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    radius: Math.random() * 2.5 + 0.5,
-                    speedY: Math.random() * 0.8 + 0.2,
-                    speedX: Math.random() * 0.4 - 0.2,
-                    opacity: Math.random() * 0.6 + 0.2
+                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+                    radius: Math.random() * 2.5 + 0.5, speedY: Math.random() * 0.8 + 0.2,
+                    speedX: Math.random() * 0.4 - 0.2, opacity: Math.random() * 0.6 + 0.2
                 }));
 
                 function animateParticles() {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     particles.forEach(p => {
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                        ctx.fillStyle = \`rgba(0, 243, 255, \${p.opacity})\`;
-                        ctx.fill();
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = \`rgba(0, 243, 255, \${p.opacity})\`; ctx.fill();
                         p.y += p.speedY; p.x += p.speedX;
-                        if (p.y > canvas.height) p.y = 0;
-                        if (p.x > canvas.width) p.x = 0;
-                        if (p.x < 0) p.x = canvas.width;
+                        if (p.y > canvas.height) p.y = 0; if (p.x > canvas.width) p.x = 0;
                     });
                     requestAnimationFrame(animateParticles);
                 }
@@ -277,9 +251,7 @@ app.get('/verify', async (req, res) => {
                     if (!turnstileResponseToken) return alert("Please complete Captcha!");
 
                     const btn = document.getElementById('vBtn');
-                    const status = document.getElementById('status');
                     btn.disabled = true; btn.innerText = "INITIALIZING...";
-                    status.innerText = "Validating security check...";
 
                     try {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
@@ -295,7 +267,6 @@ app.get('/verify', async (req, res) => {
                         }
                     } catch(e) {
                         alert("Network Error!");
-                        if (window.turnstile) window.turnstile.reset();
                         btn.disabled = true; btn.innerText = "VERIFY NOW";
                     }
                 }
@@ -304,20 +275,13 @@ app.get('/verify', async (req, res) => {
                     document.getElementById('step1').classList.add('hidden');
                     document.getElementById('step2').classList.remove('hidden');
 
-                    let seconds = 5;
+                    let seconds = 3;
                     const timerCount = document.getElementById('timerCount');
-                    timerCount.innerText = seconds;
-
                     const timer = setInterval(() => {
                         seconds--;
                         if (seconds >= 0) timerCount.innerText = seconds;
-
                         if (seconds < 0) {
                             clearInterval(timer);
-                            document.getElementById('spinnerWrapper').style.display = 'none';
-                            document.getElementById('checkIcon').style.display = 'block';
-                            document.getElementById('redirectBtn').classList.remove('hidden');
-                            document.getElementById('statusMsg').innerText = "Verification link ready!";
                             goShortlink();
                         }
                     }, 1000);
@@ -344,13 +308,12 @@ app.get('/verify', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK & SAVE TIME
+// 2️⃣ STEP 2: GENERATE SHORTLINK & INIT TRACKING
 // ----------------------------------------------------------------------
 app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
 
-    if (!token) return res.json({ success: false, message: "Token missing" });
-    if (!cf_token) return res.json({ success: false, message: "Captcha token missing" });
+    if (!token || !cf_token) return res.json({ success: false, message: "Missing parameters" });
 
     try {
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -364,16 +327,16 @@ app.get('/api/process-token', async (req, res) => {
         }
 
         const cleanToken = token.trim();
-
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken, is_used: false });
+
         if (!tokenDoc) {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // Record creation timestamp for 40-sec check
+        // Initialize completion tracking
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { generated_at: Date.now() } }
+            { $set: { generated_at: Date.now(), is_completed: false } }
         );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
@@ -381,11 +344,11 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Shortener configuration missing." });
         }
 
-        // Target URL points to GATEKEEPER ENDPOINT (/claim)
         const hostUrl = req.protocol + '://' + req.get('host');
         const targetProxyUrl = `${hostUrl}/claim?token=${cleanToken}`;
 
-        const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}`;
+        // Send alias/token for postback identification
+        const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}&alias=${cleanToken}`;
         const response = await axios.get(shortenerApiUrl);
         
         const shortUrl = response.data.shortenedUrl || response.data.url;
@@ -402,14 +365,12 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: GATEKEEPER MINI APP PAGE (/claim)
+// 3️⃣ STEP 3: GATEKEEPER PAGE (/claim)
 // ----------------------------------------------------------------------
 app.get('/claim', async (req, res) => {
     const { token } = req.query;
 
-    if (!token) {
-        return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
-    }
+    if (!token) return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
 
     try {
         const cleanToken = token.trim();
@@ -423,7 +384,6 @@ app.get('/claim', async (req, res) => {
             return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
         }
 
-        // Render Mini App UI for Claiming
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -431,9 +391,7 @@ app.get('/claim', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Security Verification Gateway</title>
-            
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
-            
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -442,40 +400,31 @@ app.get('/claim', async (req, res) => {
                     display: flex; justify-content: center; align-items: center;
                     min-height: 100vh; overflow: hidden; position: relative;
                 }
-                #fogCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
                 .card {
-                    position: relative; z-index: 2;
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
-                    -webkit-backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
                     box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; color: #fff; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
+                h2 { font-size: 20px; color: #fff; margin-bottom: 8px; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; }
                 .btn {
                     background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
-                    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
                 }
-                .btn:hover { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); transform: translateY(-1px); }
                 .hidden { display: none; }
-
                 .spinner-wrapper {
-                    position: relative; width: 65px; height: 65px;
-                    margin: 0 auto 20px; display: flex;
-                    align-items: center; justify-content: center;
+                    position: relative; width: 65px; height: 65px; margin: 0 auto 20px;
+                    display: flex; align-items: center; justify-content: center;
                 }
                 .spinner {
-                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                    position: absolute; width: 100%; height: 100%;
                     border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
                     border-radius: 50%; animation: spin 1s linear infinite;
                 }
-                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
-                .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
+                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                
                 .denied-box {
                     background: rgba(255, 0, 85, 0.1); border: 1px solid #ff0055;
                     border-radius: 8px; padding: 15px; margin-bottom: 15px; color: #ff0055;
@@ -484,31 +433,25 @@ app.get('/claim', async (req, res) => {
             </style>
         </head>
         <body>
-            <canvas id="fogCanvas"></canvas>
-
             <div class="card">
-                <!-- STEP 1: 5 SECONDS SECURITY CHECKING -->
                 <div id="checkStep">
                     <div class="spinner-wrapper">
                         <div class="spinner"></div>
-                        <span id="scanCount" class="timer-count">5</span>
+                        <span id="scanCount" class="timer-count">3</span>
                     </div>
-                    <h2>VERIFYING SECURITY...</h2>
-                    <p class="sub">PLEASE WAIT WHILE WE SCAN HUMAN INTERACTION TIME...</p>
+                    <h2>VERIFYING TASK...</h2>
+                    <p class="sub">VERIFYING COMPLETION WITH SHORTENER SERVER...</p>
                 </div>
 
-                <!-- STEP 2A: SUCCESS CLAIM BUTTON -->
                 <div id="claimStep" class="hidden">
-                    <div class="checkmark" style="display:block;">✓</div>
-                    <h2>VERIFICATION COMPLETE</h2>
-                    <p class="sub">CLICK BELOW TO CLAIM YOUR TOKEN AND RETURN TO BOT</p>
+                    <h2 style="color:#10b981;">✓ TASK VERIFIED</h2>
+                    <p class="sub">CLICK BELOW TO CLAIM YOUR TOKEN IN BOT</p>
                     <button id="claimBtn" class="btn" onclick="executeClaim()">🎁 CLAIM YOUR TOKEN</button>
                 </div>
 
-                <!-- STEP 2B: BYPASS DETECTED DENIED -->
                 <div id="deniedStep" class="hidden">
-                    <div class="denied-box">[ BYPASS BOT DETECTED ]</div>
-                    <h2>ACCESS RESTRICTED</h2>
+                    <div class="denied-box">[ ACCESS RESTRICTED ]</div>
+                    <h2>VERIFICATION FAILED</h2>
                     <p id="deniedReason" class="sub" style="color:#ef4444;"></p>
                     <a href="https://t.me/SmartfilestorebyAcbot" class="btn" style="text-decoration:none; display:block;">🔄 GET NEW LINK</a>
                 </div>
@@ -520,33 +463,7 @@ app.get('/claim', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
-                // Fog Particle Animation
-                const canvas = document.getElementById('fogCanvas');
-                const ctx = canvas.getContext('2d');
-                function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-                resizeCanvas();
-                window.addEventListener('resize', resizeCanvas);
-
-                const particles = Array.from({ length: 60 }, () => ({
-                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-                    radius: Math.random() * 2.5 + 0.5, speedY: Math.random() * 0.8 + 0.2,
-                    speedX: Math.random() * 0.4 - 0.2, opacity: Math.random() * 0.6 + 0.2
-                }));
-
-                function animateParticles() {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    particles.forEach(p => {
-                        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                        ctx.fillStyle = \`rgba(0, 243, 255, \${p.opacity})\`; ctx.fill();
-                        p.y += p.speedY; p.x += p.speedX;
-                        if (p.y > canvas.height) p.y = 0; if (p.x > canvas.width) p.x = 0; if (p.x < 0) p.x = canvas.width;
-                    });
-                    requestAnimationFrame(animateParticles);
-                }
-                animateParticles();
-
-                // 5-Seconds Scan Logic
-                let scanSeconds = 5;
+                let scanSeconds = 3;
                 const scanCount = document.getElementById('scanCount');
                 
                 const scanTimer = setInterval(() => {
@@ -555,13 +472,13 @@ app.get('/claim', async (req, res) => {
 
                     if (scanSeconds < 0) {
                         clearInterval(scanTimer);
-                        verify40SecGate();
+                        verifyTaskCompletion();
                     }
                 }, 1000);
 
                 let finalBotUrl = "";
 
-                async function verify40SecGate() {
+                async function verifyTaskCompletion() {
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}\`);
                         const data = await res.json();
@@ -572,7 +489,7 @@ app.get('/claim', async (req, res) => {
                             finalBotUrl = data.url;
                             document.getElementById('claimStep').classList.remove('hidden');
                         } else {
-                            document.getElementById('deniedReason').innerText = data.message || "Bypass bot detected or link expired.";
+                            document.getElementById('deniedReason').innerText = data.message || "Bypass bot detected or shortlink incomplete.";
                             document.getElementById('deniedStep').classList.remove('hidden');
                         }
                     } catch(e) {
@@ -623,24 +540,20 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Token has already been claimed." });
         }
 
-        const generatedAt = tokenDoc.generated_at || Date.now();
-        const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
-
-        // ⏱️ MINIMUM 40 SECONDS SECURITY CHECK
-        if (timeElapsedSeconds < 60) {
+        // 🛡️ WEBHOOK CHECK: PURE & UNBYPASSABLE
+        if (!tokenDoc.is_completed) {
             return res.json({ 
                 success: false, 
-                message: `BYPASS DETECTED! You completed verification in ${timeElapsedSeconds}s. Minimum required time is 40 seconds.` 
+                message: "BYPASS DETECTED! Confirmation not received from shortener server." 
             });
         }
 
         // Mark token as used
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { is_used: true } }
+            { $set: { is_used: true, claimed_at: Date.now() } }
         );
 
-        // Fetch Bot Username
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
         let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
         const botUsername = rawBotUsername.replace(/^@/, '');
@@ -652,6 +565,42 @@ app.get('/api/execute-claim', async (req, res) => {
     } catch (err) {
         console.error("Execute Claim Error:", err);
         return res.json({ success: false, message: "Server execution error." });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 5️⃣ STEP 5: SHORTLINK WEBHOOK / POSTBACK RECEIVER API
+// ----------------------------------------------------------------------
+app.get('/api/postback', async (req, res) => {
+    const { token, secret } = req.query;
+
+    // Secret Key validation
+    if (secret !== POSTBACK_SECRET) {
+        return res.status(401).send("Unauthorized Access");
+    }
+
+    if (!token) {
+        return res.status(400).send("Missing token parameter");
+    }
+
+    try {
+        const cleanToken = token.trim();
+
+        // Mark token as completed by shortener
+        const updateResult = await db.collection('verify_tokens').updateOne(
+            { token: cleanToken },
+            { $set: { is_completed: true, postback_at: Date.now() } }
+        );
+
+        if (updateResult.matchedCount === 0) {
+            return res.status(404).send("Token not found");
+        }
+
+        console.log(`✅ Webhook Received Successfully for Token: ${cleanToken}`);
+        return res.status(200).send("OK");
+    } catch (err) {
+        console.error("Postback Processing Error:", err);
+        return res.status(500).send("Internal Server Error");
     }
 });
 
