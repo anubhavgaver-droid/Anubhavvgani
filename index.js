@@ -27,7 +27,9 @@ async function connectDB() {
     return db;
 }
 
-// Keep-Alive Routes
+// ----------------------------------------------------------------------
+// 🛠️ KEEP-ALIVE / HEALTH CHECK ROUTES
+// ----------------------------------------------------------------------
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
 app.get('/', (req, res) => res.status(200).send('Zender Proxy Server is Active'));
 
@@ -186,33 +188,20 @@ app.get('/verify', async (req, res) => {
                 .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
                 .hidden { display: none; }
 
-                /* Circular Spinner with Inside Counter Styles */
                 .spinner-wrapper {
-                    position: relative;
-                    width: 65px;
-                    height: 65px;
-                    margin: 0 auto 20px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
+                    position: relative; width: 65px; height: 65px;
+                    margin: 0 auto 20px; display: flex;
+                    align-items: center; justify-content: center;
                 }
                 .spinner {
-                    position: absolute;
-                    top: 0; left: 0;
-                    width: 100%; height: 100%;
-                    border: 4px solid #1e293b;
-                    border-top: 4px solid #00f3ff;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
+                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                    border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
+                    border-radius: 50%; animation: spin 1s linear infinite;
                 }
                 .timer-count {
-                    font-size: 22px;
-                    font-weight: 800;
-                    color: #00f3ff;
-                    z-index: 2;
+                    font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2;
                     text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
                 }
-
                 .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 .status { margin-top: 12px; color: #00f3ff; font-size: 13px; min-height: 18px; }
@@ -236,7 +225,6 @@ app.get('/verify', async (req, res) => {
                 </div>
 
                 <div id="step2" class="hidden">
-                    <!-- Circular Loader with Inside Counter -->
                     <div id="spinnerWrapper" class="spinner-wrapper">
                         <div class="spinner"></div>
                         <span id="timerCount" class="timer-count">5</span>
@@ -395,16 +383,21 @@ app.get('/api/process-token', async (req, res) => {
 
         const cleanToken = token.trim();
 
-        const result = await db.collection('verify_tokens').findOneAndDelete({ 
+        // Check if token exists
+        const tokenDoc = await db.collection('verify_tokens').findOne({ 
             token: cleanToken, 
             is_used: false 
         });
 
-        const tokenDoc = result.value || result;
-
-        if (!tokenDoc || !tokenDoc.token) {
+        if (!tokenDoc) {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
+
+        // Record generation time in Database for 40-sec Lock
+        await db.collection('verify_tokens').updateOne(
+            { token: cleanToken },
+            { $set: { generated_at: Date.now() } }
+        );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
 
@@ -412,12 +405,11 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Shortener configuration missing in Database." });
         }
 
-        let rawBotUsername = settings.bot_username || "SmartfilestorebyAcbot";
-        const botUsername = rawBotUsername.replace(/^@/, '');
+        // Target URL is now PROXY CLAIM ENDPOINT (Not directly Telegram Bot)
+        const hostUrl = req.protocol + '://' + req.get('host');
+        const targetProxyUrl = `${hostUrl}/claim?token=${cleanToken}`;
 
-        const targetTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
-        
-        const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetTelegramUrl)}`;
+        const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}`;
         const response = await axios.get(shortenerApiUrl);
         
         const shortUrl = response.data.shortenedUrl || response.data.url;
@@ -430,6 +422,61 @@ app.get('/api/process-token', async (req, res) => {
     } catch (err) {
         console.error("API Error:", err);
         return res.json({ success: false, message: "Server Verification Error." });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 🛡️ GATEKEEPER ENDPOINT (/claim - Minimum 40 Seconds Time Check)
+// ----------------------------------------------------------------------
+app.get('/claim', async (req, res) => {
+    const { token } = req.query;
+
+    if (!token) {
+        return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
+    }
+
+    try {
+        const cleanToken = token.trim();
+        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
+
+        if (!tokenDoc) {
+            return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired verification token."));
+        }
+
+        if (tokenDoc.is_used) {
+            return res.status(403).send(renderAccessDeniedUI("⚠️ This link has already been claimed."));
+        }
+
+        const generatedAt = tokenDoc.generated_at || Date.now();
+        const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
+
+        // ⏱️ MINIMUM TIME LOCK CHECK (40 Seconds)
+        if (timeElapsedSeconds < 40) {
+            return res.status(403).send(renderAccessDeniedUI(
+                `⚠️ <b>BYPASS BOT DETECTED!</b><br>` +
+                `You completed the verification in <b>${timeElapsedSeconds}s</b>.<br>` +
+                `Minimum required human interaction time is <b>40 seconds</b>.`
+            ));
+        }
+
+        // Mark token as used after successful gate check
+        await db.collection('verify_tokens').updateOne(
+            { token: cleanToken },
+            { $set: { is_used: true } }
+        );
+
+        // Get Bot Username
+        const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
+        let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
+        const botUsername = rawBotUsername.replace(/^@/, '');
+
+        // Redirect user to Telegram Bot
+        const finalTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
+        return res.redirect(finalTelegramUrl);
+
+    } catch (err) {
+        console.error("Claim Route Error:", err);
+        return res.status(500).send(renderAccessDeniedUI("Internal Security Check Error."));
     }
 });
 
