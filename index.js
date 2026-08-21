@@ -1,7 +1,7 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const axios = require('axios');
-const crypto = require('crypto'); // Cryptographic hashing के लिए
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,7 +29,7 @@ async function connectDB() {
     return db;
 }
 
-// Secure HMAC Hash Helper
+// Cryptographic HMAC Hash Generator
 function generateSecureHash(token, timestamp) {
     return crypto.createHmac('sha256', POSTBACK_SECRET)
                  .update(`${token}_${timestamp}`)
@@ -110,6 +110,12 @@ function renderAccessDeniedUI(reasonText) {
             </div>
             <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">🔄 GET NEW LINK</a>
         </div>
+        <script>
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+            }
+        </script>
     </body>
     </html>
     `;
@@ -143,6 +149,7 @@ app.get('/verify', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Secure Verification</title>
+            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -179,6 +186,11 @@ app.get('/verify', async (req, res) => {
             </div>
 
             <script>
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
                     turnstileResponseToken = token;
@@ -194,7 +206,12 @@ app.get('/verify', async (req, res) => {
                         const data = await res.json();
                         
                         if(data.success && data.url) {
-                            window.location.href = data.url;
+                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                                window.Telegram.WebApp.openLink(data.url);
+                                window.Telegram.WebApp.close();
+                            } else {
+                                window.location.href = data.url;
+                            }
                         } else {
                             alert(data.message || "Verification Failed!");
                             if (window.turnstile) window.turnstile.reset();
@@ -254,7 +271,6 @@ app.get('/api/process-token', async (req, res) => {
         const hostUrl = req.protocol + '://' + req.get('host');
         const targetProxyUrl = `${hostUrl}/gate?token=${cleanToken}`;
 
-        // शॉटनर API में पोस्टबैक पास करें (यदि आपकी शॉटनर साइट पोस्टबैक सपोर्ट करती है)
         const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}`;
         const response = await axios.get(shortenerApiUrl);
         
@@ -298,6 +314,7 @@ app.get('/gate', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Anti-Bypass Inspection</title>
+            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -326,6 +343,11 @@ app.get('/gate', async (req, res) => {
             </div>
 
             <script>
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+
                 let percent = 0;
                 const interval = setInterval(() => {
                     percent += 10;
@@ -372,7 +394,6 @@ app.get('/api/pass-gate', async (req, res) => {
             return res.json({ success: false, message: "Invalid or used token." });
         }
 
-        // Cryptographically signed hash
         const timestamp = Date.now();
         const hash = generateSecureHash(cleanToken, timestamp);
 
@@ -402,7 +423,6 @@ app.get('/claim', async (req, res) => {
         if (!tokenDoc) return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired token."));
         if (tokenDoc.is_used) return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
 
-        // Validate HMAC Hash
         const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
         if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
             return res.status(403).send(renderAccessDeniedUI("🛡️ BYPASS DETECTED: Invalid Security Hash."));
@@ -415,6 +435,7 @@ app.get('/claim', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Claim Gateway</title>
+            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -434,6 +455,7 @@ app.get('/claim', async (req, res) => {
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; margin-top: 15px;
                 }
+                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
             </style>
         </head>
         <body>
@@ -446,6 +468,11 @@ app.get('/claim', async (req, res) => {
             </div>
 
             <script>
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+
                 let claimCaptchaToken = "";
                 function onClaimCaptcha(token) {
                     claimCaptchaToken = token;
@@ -458,7 +485,12 @@ app.get('/claim', async (req, res) => {
                         const data = await res.json();
 
                         if (data.success && data.url) {
-                            window.location.href = data.url;
+                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                                window.Telegram.WebApp.openLink(data.url);
+                                window.Telegram.WebApp.close();
+                            } else {
+                                window.location.href = data.url;
+                            }
                         } else {
                             alert(data.message || "Security Verification Failed.");
                         }
@@ -493,19 +525,19 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        // 🛡️ 1. Gate Hash verification with HMAC
+        // 🛡️ 1. HMAC Gate Hash Validation
         const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
         if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
             return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
         }
 
-        // 🛡️ 2. Minimum Time Gap Check (3 सेकंड की न्यूनतम देरी)
+        // 🛡️ 2. Speed Check (3 सेकंड्स अंतर)
         const gateTimeDiff = Date.now() - (tokenDoc.gate_time || 0);
         if (gateTimeDiff < 3000) {
             return res.json({ success: false, message: "BYPASS DETECTED! Speed execution anomaly." });
         }
 
-        // 🛡️ 3. Strict Turnstile Captcha Check
+        // 🛡️ 3. Turnstile Captcha Check
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
             secret: TURNSTILE_SECRET_KEY,
