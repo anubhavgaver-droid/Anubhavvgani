@@ -15,6 +15,11 @@ const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2Cr
 // 🔐 Postback Secret Key
 const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "Zender_Secret_Pass_8921";
 
+// ⚙️ POSTBACK REQUIREMENT FLAG:
+// Jab tak admin Postback URL add nahi karte, ise `false` rakhein taaki normal work kare.
+// Admin ke webhook add karne ke baad ise `true` kar dein.
+const REQUIRE_POSTBACK = false; 
+
 let db;
 
 async function connectDB() {
@@ -125,7 +130,7 @@ function renderAccessDeniedUI(reasonText) {
 
 // Access Denied Render Endpoint
 app.get('/access-denied', (req, res) => {
-    const reason = req.query.reason || "Shortlink task was skipped or security verification failed.";
+    const reason = req.query.reason || "Verification process failed.";
     res.send(renderAccessDeniedUI(reason));
 });
 
@@ -501,7 +506,6 @@ app.get('/claim', async (req, res) => {
                                 window.location.href = data.url;
                             }
                         } else {
-                            // 🚨 अब Alert की जगह सीधे UI Access Denied स्क्रीन पर रिडायरेक्ट करेगा!
                             window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
                         }
                     } catch(e) {
@@ -520,7 +524,7 @@ app.get('/claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK (STRICT POSTBACK CHECK)
+// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK
 // ----------------------------------------------------------------------
 app.get('/api/execute-claim', async (req, res) => {
     const { token, hash, cf_token } = req.query;
@@ -535,8 +539,8 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        // 🚨 1. POSTBACK CHECK (शॉर्टलिंक कम्प्लीशन वेरिफिकेशन)
-        if (!tokenDoc.is_completed) {
+        // 🚨 1. POSTBACK CHECK (Only active if REQUIRE_POSTBACK === true)
+        if (REQUIRE_POSTBACK && !tokenDoc.is_completed) {
             return res.json({ 
                 success: false, 
                 message: "🚫 BYPASS DETECTED: Shortlink task was skipped or not completed via Official Site!" 
@@ -549,13 +553,7 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
         }
 
-        // 🛡️ 3. Minimum Time Gap Check
-        const gateTimeDiff = Date.now() - (tokenDoc.gate_time || 0);
-        if (gateTimeDiff < 3000) {
-            return res.json({ success: false, message: "BYPASS DETECTED! Speed execution anomaly." });
-        }
-
-        // 🛡️ 4. Cloudflare Turnstile Captcha Check
+        // 🛡️ 3. Cloudflare Turnstile Captcha Check
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
             secret: TURNSTILE_SECRET_KEY,
