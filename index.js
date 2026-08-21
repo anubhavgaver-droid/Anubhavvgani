@@ -6,16 +6,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI; 
 
-// Database Name
 const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 
-// Cloudflare Turnstile Keys
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
 
 let db;
 
-// MongoDB Connection Helper
 async function connectDB() {
     if (!db) {
         try {
@@ -30,7 +27,6 @@ async function connectDB() {
     return db;
 }
 
-// Connection Middleware
 app.use(async (req, res, next) => {
     await connectDB();
     if (!db) {
@@ -39,7 +35,6 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Verification UI Page
 app.get('/verify', async (req, res) => {
     const { token } = req.query;
 
@@ -76,8 +71,12 @@ app.get('/verify', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Secure Verification</title>
+            
+            <!-- Telegram Mini App SDK -->
+            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <!-- Cloudflare Turnstile Script -->
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+            
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -166,12 +165,11 @@ app.get('/verify', async (req, res) => {
             <canvas id="fogCanvas"></canvas>
 
             <div class="card">
-                <!-- STEP 1: CAPTCHA & INITIAL UI -->
+                <!-- STEP 1 -->
                 <div id="step1">
                     <h2>SECURE VERIFICATION</h2>
                     <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK TO PROCEED. 🎴</p>
                     
-                    <!-- Cloudflare Turnstile Widget -->
                     <div class="turnstile-container">
                         <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-theme="dark" data-callback="onCaptchaSuccess"></div>
                     </div>
@@ -180,7 +178,7 @@ app.get('/verify', async (req, res) => {
                     <div id="status" class="status">Please complete captcha above</div>
                 </div>
 
-                <!-- STEP 2: 5s COUNTDOWN REDIRECT UI -->
+                <!-- STEP 2 -->
                 <div id="step2" class="hidden">
                     <div id="loadingSpinner" class="spinner"></div>
                     <div id="checkIcon" class="checkmark">✓</div>
@@ -192,7 +190,13 @@ app.get('/verify', async (req, res) => {
             </div>
 
             <script>
-                // 1. Fog Particles Animation Engine
+                // Initialize Telegram WebApp
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+
+                // Fog Animation Engine
                 const canvas = document.getElementById('fogCanvas');
                 const ctx = canvas.getContext('2d');
                 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -224,7 +228,7 @@ app.get('/verify', async (req, res) => {
                 }
                 animateParticles();
 
-                // 2. Turnstile Callback
+                // Turnstile Callback
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
                     turnstileResponseToken = token;
@@ -232,7 +236,6 @@ app.get('/verify', async (req, res) => {
                     document.getElementById('status').innerText = "";
                 }
 
-                // 3. Token & Verification Processing
                 let destinationUrl = "";
 
                 async function processVerify() {
@@ -292,9 +295,15 @@ app.get('/verify', async (req, res) => {
                     }, 1000);
                 }
 
+                // Mini App Compatible Redirect Handler
                 function goShortlink() {
                     if (destinationUrl) {
-                        window.location.href = destinationUrl;
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                            window.Telegram.WebApp.openLink(destinationUrl);
+                            window.Telegram.WebApp.close();
+                        } else {
+                            window.location.href = destinationUrl;
+                        }
                     }
                 }
             </script>
@@ -307,7 +316,6 @@ app.get('/verify', async (req, res) => {
     }
 });
 
-// Single-Use Anti-Bypass API Endpoint with Turnstile Server Validation
 app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
 
@@ -315,7 +323,6 @@ app.get('/api/process-token', async (req, res) => {
     if (!cf_token) return res.json({ success: false, message: "Captcha token missing" });
 
     try {
-        // 1. Verify Turnstile Token with Cloudflare Server
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
             secret: TURNSTILE_SECRET_KEY,
@@ -328,7 +335,6 @@ app.get('/api/process-token', async (req, res) => {
 
         const cleanToken = token.trim();
 
-        // 2. Atomically find & delete token from MongoDB
         const result = await db.collection('verify_tokens').findOneAndDelete({ 
             token: cleanToken, 
             is_used: false 
@@ -340,7 +346,6 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // Fetch settings from DB
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
 
         if (!settings || !settings.shortlink_url || !settings.shortlink_api) {
