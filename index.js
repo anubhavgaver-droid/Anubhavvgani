@@ -1,6 +1,7 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const axios = require('axios');
+const crypto = require('crypto'); // Cryptographic hashing के लिए
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,13 @@ async function connectDB() {
         }
     }
     return db;
+}
+
+// Secure HMAC Hash Helper
+function generateSecureHash(token, timestamp) {
+    return crypto.createHmac('sha256', POSTBACK_SECRET)
+                 .update(`${token}_${timestamp}`)
+                 .digest('hex');
 }
 
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
@@ -102,12 +110,6 @@ function renderAccessDeniedUI(reasonText) {
             </div>
             <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">🔄 GET NEW LINK</a>
         </div>
-        <script>
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.ready();
-                window.Telegram.WebApp.expand();
-            }
-        </script>
     </body>
     </html>
     `;
@@ -141,7 +143,6 @@ app.get('/verify', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Secure Verification</title>
-            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -149,78 +150,42 @@ app.get('/verify', async (req, res) => {
                     background: #0b0f19; color: white;
                     font-family: 'Segoe UI', -apple-system, sans-serif;
                     display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden; position: relative;
+                    min-height: 100vh; overflow: hidden;
                 }
                 .card {
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
-                    box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; color: #fff; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; }
+                h2 { font-size: 20px; margin-bottom: 8px; color: #fff; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; }
                 .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; }
                 .btn {
                     background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
-                    border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
+                    border-radius: 8px; cursor: pointer; width: 100%;
                 }
                 .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
-                .hidden { display: none; }
-                .spinner-wrapper {
-                    position: relative; width: 65px; height: 65px;
-                    margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
-                }
-                .spinner {
-                    position: absolute; width: 100%; height: 100%;
-                    border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
-                    border-radius: 50%; animation: spin 1s linear infinite;
-                }
-                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                .status { margin-top: 12px; color: #00f3ff; font-size: 13px; }
             </style>
         </head>
         <body>
             <div class="card">
-                <div id="step1">
-                    <h2>SECURE VERIFICATION</h2>
-                    <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK 🎴</p>
-                    <div class="turnstile-container">
-                        <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-theme="dark" data-callback="onCaptchaSuccess"></div>
-                    </div>
-                    <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY NOW</button>
-                    <div id="status" class="status">Please complete captcha above</div>
+                <h2>SECURE VERIFICATION</h2>
+                <p class="sub">PLEASE COMPLETE THIS CHECK 🎴</p>
+                <div class="turnstile-container">
+                    <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onCaptchaSuccess"></div>
                 </div>
-
-                <div id="step2" class="hidden">
-                    <div class="spinner-wrapper">
-                        <div class="spinner"></div>
-                        <span id="timerCount" class="timer-count">3</span>
-                    </div>
-                    <h2>REDIRECTING...</h2>
-                    <p id="statusMsg" class="sub">PREPARING SHORTLINK DESTINATION...</p>
-                </div>
+                <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY & CONTINUE</button>
             </div>
 
             <script>
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
                     turnstileResponseToken = token;
                     document.getElementById('vBtn').disabled = false;
-                    document.getElementById('status').innerText = "";
                 }
 
-                let destinationUrl = "";
-
                 async function processVerify() {
-                    if (!turnstileResponseToken) return alert("Please complete Captcha!");
-
                     const btn = document.getElementById('vBtn');
                     btn.disabled = true; btn.innerText = "INITIALIZING...";
 
@@ -229,43 +194,15 @@ app.get('/verify', async (req, res) => {
                         const data = await res.json();
                         
                         if(data.success && data.url) {
-                            destinationUrl = data.url;
-                            startCountdown();
+                            window.location.href = data.url;
                         } else {
                             alert(data.message || "Verification Failed!");
                             if (window.turnstile) window.turnstile.reset();
-                            btn.disabled = true; btn.innerText = "VERIFY NOW";
+                            btn.disabled = true; btn.innerText = "VERIFY & CONTINUE";
                         }
                     } catch(e) {
                         alert("Network Error!");
-                        btn.disabled = true; btn.innerText = "VERIFY NOW";
-                    }
-                }
-
-                function startCountdown() {
-                    document.getElementById('step1').classList.add('hidden');
-                    document.getElementById('step2').classList.remove('hidden');
-
-                    let seconds = 3;
-                    const timerCount = document.getElementById('timerCount');
-                    const timer = setInterval(() => {
-                        seconds--;
-                        if (seconds >= 0) timerCount.innerText = seconds;
-                        if (seconds < 0) {
-                            clearInterval(timer);
-                            goShortlink();
-                        }
-                    }, 1000);
-                }
-
-                function goShortlink() {
-                    if (destinationUrl) {
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                            window.Telegram.WebApp.openLink(destinationUrl);
-                            window.Telegram.WebApp.close();
-                        } else {
-                            window.location.href = destinationUrl;
-                        }
+                        btn.disabled = true; btn.innerText = "VERIFY & CONTINUE";
                     }
                 }
             </script>
@@ -315,10 +252,10 @@ app.get('/api/process-token', async (req, res) => {
         }
 
         const hostUrl = req.protocol + '://' + req.get('host');
-        // शॉर्टलिंक का फाइनल टारगेट अब /gate रहेगा (/claim नहीं)
         const targetProxyUrl = `${hostUrl}/gate?token=${cleanToken}`;
 
-        const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}&alias=${cleanToken}`;
+        // शॉटनर API में पोस्टबैक पास करें (यदि आपकी शॉटनर साइट पोस्टबैक सपोर्ट करती है)
+        const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}`;
         const response = await axios.get(shortenerApiUrl);
         
         const shortUrl = response.data.shortenedUrl || response.data.url;
@@ -335,7 +272,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (न्यू इमिटेटर/फिल्टर)
+// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE
 // ----------------------------------------------------------------------
 app.get('/gate', async (req, res) => {
     const { token } = req.query;
@@ -361,7 +298,6 @@ app.get('/gate', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Anti-Bypass Inspection</title>
-            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -371,62 +307,34 @@ app.get('/gate', async (req, res) => {
                     min-height: 100vh; overflow: hidden;
                 }
                 .card {
-                    background: rgba(13, 17, 23, 0.9); backdrop-filter: blur(16px);
+                    background: rgba(13, 17, 23, 0.9);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 30px 24px; text-align: center; width: 90%; max-width: 380px;
-                    box-shadow: 0 0 30px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 18px; color: #00f3ff; margin-bottom: 6px; letter-spacing: 1px; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 20px; }
+                h2 { font-size: 18px; color: #00f3ff; margin-bottom: 6px; }
                 .progress-bar {
                     width: 100%; height: 8px; background: rgba(255,255,255,0.1);
-                    border-radius: 4px; overflow: hidden; margin-bottom: 15px; position: relative;
+                    border-radius: 4px; overflow: hidden; margin-top: 15px;
                 }
                 .fill { width: 0%; height: 100%; background: #00f3ff; transition: width 0.1s linear; }
-                .status-log { font-size: 11px; color: #10b981; font-family: monospace; }
             </style>
         </head>
         <body>
             <div class="card">
                 <h2>🔍 INSPECTING TRAFFIC...</h2>
-                <p class="sub">Analyzing browser environment & human signals...</p>
                 <div class="progress-bar"><div id="progress" class="fill"></div></div>
-                <div id="log" class="status-log">Checking Headless Drivers...</div>
             </div>
 
             <script>
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-
-                // Browser Fingerprinting Check (Bot Detection)
-                function isBot() {
-                    const isHeadless = navigator.webdriver || !navigator.languages || navigator.languages.length === 0;
-                    const hasInvalidScreen = window.outerWidth === 0 && window.outerHeight === 0;
-                    return isHeadless || hasInvalidScreen;
-                }
-
                 let percent = 0;
-                const progress = document.getElementById('progress');
-                const log = document.getElementById('log');
-
                 const interval = setInterval(() => {
-                    percent += 5;
-                    progress.style.width = percent + '%';
-
-                    if (percent === 30) log.innerText = "Verifying Screen Resolution & Touch API...";
-                    if (percent === 70) log.innerText = "Establishing Anti-Bypass Handshake...";
-
+                    percent += 10;
+                    document.getElementById('progress').style.width = percent + '%';
                     if (percent >= 100) {
                         clearInterval(interval);
-                        if (isBot()) {
-                            alert("Bypass Bot Detected!");
-                            return;
-                        }
                         passGate();
                     }
-                }, 100);
+                }, 150);
 
                 async function passGate() {
                     try {
@@ -435,7 +343,7 @@ app.get('/gate', async (req, res) => {
                         if (data.success) {
                             window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
                         } else {
-                            alert(data.message || "Security Inspection Failed.");
+                            alert(data.message || "Security Check Failed.");
                         }
                     } catch(e) {
                         alert("Gate connection error.");
@@ -451,7 +359,7 @@ app.get('/gate', async (req, res) => {
     }
 });
 
-// Gate Verification Handshake API
+// Secure Pass Gate API
 app.get('/api/pass-gate', async (req, res) => {
     const { token } = req.query;
     if (!token) return res.json({ success: false, message: "Missing token." });
@@ -461,15 +369,16 @@ app.get('/api/pass-gate', async (req, res) => {
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
         if (!tokenDoc || tokenDoc.is_used) {
-            return res.json({ success: false, message: "Invalid token." });
+            return res.json({ success: false, message: "Invalid or used token." });
         }
 
-        // Generate dynamic Hash
-        const hash = Buffer.from(`${cleanToken}_GATE_PASSED_${Date.now()}`).toString('base64');
+        // Cryptographically signed hash
+        const timestamp = Date.now();
+        const hash = generateSecureHash(cleanToken, timestamp);
 
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { gate_passed: true, gate_hash: hash, gate_time: Date.now() } }
+            { $set: { gate_passed: true, gate_hash: hash, gate_time: timestamp } }
         );
 
         return res.json({ success: true, hash });
@@ -479,7 +388,7 @@ app.get('/api/pass-gate', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 4️⃣ STEP 4: CLAIM PAGE (गेट पास होने के बाद ही खुलेगा)
+// 4️⃣ STEP 4: CLAIM PAGE
 // ----------------------------------------------------------------------
 app.get('/claim', async (req, res) => {
     const { token, hash } = req.query;
@@ -493,9 +402,10 @@ app.get('/claim', async (req, res) => {
         if (!tokenDoc) return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired token."));
         if (tokenDoc.is_used) return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
 
-        // strict hash match
-        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash) {
-            return res.status(403).send(renderAccessDeniedUI("🛡️ BYPASS DETECTED: Intermediate gate security bypassed."));
+        // Validate HMAC Hash
+        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
+        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
+            return res.status(403).send(renderAccessDeniedUI("🛡️ BYPASS DETECTED: Invalid Security Hash."));
         }
 
         res.send(`
@@ -505,7 +415,6 @@ app.get('/claim', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Claim Gateway</title>
-            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -513,126 +422,48 @@ app.get('/claim', async (req, res) => {
                     background: #0b0f19; color: white;
                     font-family: 'Segoe UI', -apple-system, sans-serif;
                     display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden;
+                    min-height: 100vh;
                 }
                 .card {
-                    background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
+                    background: rgba(19, 27, 46, 0.85);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
-                    box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 20px; color: #fff; margin-bottom: 8px; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; }
                 .btn {
                     background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
-                    border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
-                }
-                .hidden { display: none; }
-                .spinner-wrapper {
-                    position: relative; width: 65px; height: 65px; margin: 0 auto 20px;
-                    display: flex; align-items: center; justify-content: center;
-                }
-                .spinner {
-                    position: absolute; width: 100%; height: 100%;
-                    border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
-                    border-radius: 50%; animation: spin 1s linear infinite;
-                }
-                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                .denied-box {
-                    background: rgba(255, 0, 85, 0.1); border: 1px solid #ff0055;
-                    border-radius: 8px; padding: 15px; margin-bottom: 15px; color: #ff0055;
-                    font-size: 13px; font-weight: bold;
+                    border-radius: 8px; cursor: pointer; width: 100%; margin-top: 15px;
                 }
             </style>
         </head>
         <body>
             <div class="card">
-                <div id="checkStep">
-                    <div class="spinner-wrapper">
-                        <div class="spinner"></div>
-                        <span id="scanCount" class="timer-count">3</span>
-                    </div>
-                    <h2>VERIFYING TASK...</h2>
-                    <p class="sub">VERIFYING COMPLETION WITH SECURITY GATEWAY...</p>
-                    
-                    <div class="cf-turnstile" 
-                         data-sitekey="${TURNSTILE_SITE_KEY}" 
-                         data-theme="dark" 
-                         data-size="compact"
-                         data-callback="onClaimCaptchaSuccess"></div>
+                <h2>VERIFY TASK</h2>
+                <div style="display:flex; justify-content:center; margin-top:15px;">
+                    <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onClaimCaptcha"></div>
                 </div>
-
-                <div id="claimStep" class="hidden">
-                    <h2 style="color:#10b981;">✓ TASK VERIFIED</h2>
-                    <p class="sub">CLICK BELOW TO CLAIM YOUR TOKEN IN BOT</p>
-                    <button id="claimBtn" class="btn" onclick="executeClaim()">🎁 CLAIM YOUR TOKEN</button>
-                </div>
-
-                <div id="deniedStep" class="hidden">
-                    <div class="denied-box">[ ACCESS RESTRICTED ]</div>
-                    <h2>VERIFICATION FAILED</h2>
-                    <p id="deniedReason" class="sub" style="color:#ef4444;"></p>
-                    <a href="https://t.me/SmartfilestorebyAcbot" class="btn" style="text-decoration:none; display:block;">🔄 GET NEW LINK</a>
-                </div>
+                <button id="claimBtn" class="btn" onclick="executeClaim()" disabled>🎁 CLAIM YOUR TOKEN</button>
             </div>
 
             <script>
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-
                 let claimCaptchaToken = "";
-                function onClaimCaptchaSuccess(token) {
+                function onClaimCaptcha(token) {
                     claimCaptchaToken = token;
+                    document.getElementById('claimBtn').disabled = false;
                 }
 
-                let scanSeconds = 3;
-                const scanCount = document.getElementById('scanCount');
-                
-                const scanTimer = setInterval(() => {
-                    scanSeconds--;
-                    if (scanSeconds >= 0) scanCount.innerText = scanSeconds;
-
-                    if (scanSeconds < 0) {
-                        clearInterval(scanTimer);
-                        verifyTaskCompletion();
-                    }
-                }, 1000);
-
-                let finalBotUrl = "";
-
-                async function verifyTaskCompletion() {
+                async function executeClaim() {
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
                         const data = await res.json();
 
-                        document.getElementById('checkStep').classList.add('hidden');
-
                         if (data.success && data.url) {
-                            finalBotUrl = data.url;
-                            document.getElementById('claimStep').classList.remove('hidden');
+                            window.location.href = data.url;
                         } else {
-                            document.getElementById('deniedReason').innerText = data.message || "Bypass bot detected or security check failed.";
-                            document.getElementById('deniedStep').classList.remove('hidden');
+                            alert(data.message || "Security Verification Failed.");
                         }
                     } catch(e) {
-                        document.getElementById('checkStep').classList.add('hidden');
-                        document.getElementById('deniedReason').innerText = "Network verification error.";
-                        document.getElementById('deniedStep').classList.remove('hidden');
-                    }
-                }
-
-                function executeClaim() {
-                    if (finalBotUrl) {
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                            window.Telegram.WebApp.openLink(finalBotUrl);
-                            window.Telegram.WebApp.close();
-                        } else {
-                            window.location.href = finalBotUrl;
-                        }
+                        alert("Network verification error.");
                     }
                 }
             </script>
@@ -647,12 +478,12 @@ app.get('/claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK (/api/execute-claim)
+// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK
 // ----------------------------------------------------------------------
 app.get('/api/execute-claim', async (req, res) => {
     const { token, hash, cf_token } = req.query;
 
-    if (!token || !hash) return res.json({ success: false, message: "Token/Hash missing." });
+    if (!token || !hash || !cf_token) return res.json({ success: false, message: "Token/Hash/Captcha missing." });
 
     try {
         const cleanToken = token.trim();
@@ -662,28 +493,27 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        // 🛡️ 1. Gate Hash verification
-        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash) {
-            return res.json({ success: false, message: "BYPASS DETECTED! Intermediary gate skipped." });
+        // 🛡️ 1. Gate Hash verification with HMAC
+        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
+        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
+            return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
         }
 
-        // 🛡️ 2. Minimum Time Gap Check (3 सेकंड से पहले रिक्वेस्ट आई तो बोट माना जाएगा)
+        // 🛡️ 2. Minimum Time Gap Check (3 सेकंड की न्यूनतम देरी)
         const gateTimeDiff = Date.now() - (tokenDoc.gate_time || 0);
-        if (gateTimeDiff < 2500) {
-            return res.json({ success: false, message: "BYPASS DETECTED! Unnaturally fast execution speed." });
+        if (gateTimeDiff < 3000) {
+            return res.json({ success: false, message: "BYPASS DETECTED! Speed execution anomaly." });
         }
 
-        // 🛡️ 3. Turnstile Captcha Check
-        if (cf_token) {
-            const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-            const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
-                secret: TURNSTILE_SECRET_KEY,
-                response: cf_token
-            }));
+        // 🛡️ 3. Strict Turnstile Captcha Check
+        const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+        const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
+            secret: TURNSTILE_SECRET_KEY,
+            response: cf_token
+        }));
 
-            if (!cfResponse.data.success) {
-                return res.json({ success: false, message: "Security Captcha verification failed!" });
-            }
+        if (!cfResponse.data.success) {
+            return res.json({ success: false, message: "Security Captcha verification failed!" });
         }
 
         // Mark token as used
@@ -707,7 +537,7 @@ app.get('/api/execute-claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 6️⃣ STEP 6: POSTBACK RECEIVER (IF AVAILABLE)
+// 6️⃣ STEP 6: POSTBACK RECEIVER (Webhook)
 // ----------------------------------------------------------------------
 app.get('/api/postback', async (req, res) => {
     const { token, secret } = req.query;
