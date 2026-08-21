@@ -27,9 +27,7 @@ async function connectDB() {
     return db;
 }
 
-// ----------------------------------------------------------------------
-// 🛠️ KEEP-ALIVE / HEALTH CHECK ROUTES (For Cron-Job.org & Sleep Prevention)
-// ----------------------------------------------------------------------
+// Keep-Alive Routes
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
 app.get('/', (req, res) => res.status(200).send('Zender Proxy Server is Active'));
 
@@ -41,11 +39,11 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Helper Function: Cyan HUD Access Denied Template
+// Pure English Access Denied HUD Template
 function renderAccessDeniedUI(reasonText) {
     return `
     <!DOCTYPE html>
-    <html lang="hi">
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -114,14 +112,14 @@ function renderAccessDeniedUI(reasonText) {
         <div class="hud-card">
             <div class="badge-denied">[ ACCESS DENIED ]</div>
             <div class="status-icon">⚠️</div>
-            <h1 class="title">सत्यापन विफल (Verification Failed)</h1>
-            <p class="subtitle">सुरक्षा प्रोटोकॉल के कारण अनुरोध को निरस्त कर दिया गया है।</p>
+            <h1 class="title">Verification Failed</h1>
+            <p class="subtitle">Access has been restricted by system security protocols.</p>
             <div class="reason-box">
                 <div class="reason-title">SYSTEM DIAGNOSTIC:</div>
                 <div class="reason-text">${reasonText}</div>
             </div>
             <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">
-                🔄 नया लिंक प्राप्त करें (Get New Link)
+                🔄 GET NEW LINK
             </a>
         </div>
     </body>
@@ -133,7 +131,7 @@ app.get('/verify', async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
-        return res.status(400).send(renderAccessDeniedUI("🚫 अमान्य टोकन पैरामीटर (Missing or Invalid Token)"));
+        return res.status(400).send(renderAccessDeniedUI("🚫 Missing or invalid token parameter."));
     }
 
     try {
@@ -144,7 +142,7 @@ app.get('/verify', async (req, res) => {
         });
 
         if (!tokenDoc) {
-            return res.status(403).send(renderAccessDeniedUI("⚡ यह लिंक पहले ही इस्तेमाल हो चुका है या एक्सपायर हो गया है।"));
+            return res.status(403).send(renderAccessDeniedUI("⚡ Token has already been used or link expired."));
         }
 
         res.send(`
@@ -187,11 +185,34 @@ app.get('/verify', async (req, res) => {
                 .btn:hover { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); transform: translateY(-1px); }
                 .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
                 .hidden { display: none; }
-                .spinner {
-                    width: 48px; height: 48px; border: 4px solid #1e293b;
-                    border-top: 4px solid #00f3ff; border-radius: 50%;
-                    margin: 0 auto 20px; animation: spin 1s linear infinite;
+
+                /* Circular Spinner with Inside Counter Styles */
+                .spinner-wrapper {
+                    position: relative;
+                    width: 65px;
+                    height: 65px;
+                    margin: 0 auto 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 }
+                .spinner {
+                    position: absolute;
+                    top: 0; left: 0;
+                    width: 100%; height: 100%;
+                    border: 4px solid #1e293b;
+                    border-top: 4px solid #00f3ff;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+                .timer-count {
+                    font-size: 22px;
+                    font-weight: 800;
+                    color: #00f3ff;
+                    z-index: 2;
+                    text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+                }
+
                 .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 .status { margin-top: 12px; color: #00f3ff; font-size: 13px; min-height: 18px; }
@@ -215,10 +236,15 @@ app.get('/verify', async (req, res) => {
                 </div>
 
                 <div id="step2" class="hidden">
-                    <div id="loadingSpinner" class="spinner"></div>
+                    <!-- Circular Loader with Inside Counter -->
+                    <div id="spinnerWrapper" class="spinner-wrapper">
+                        <div class="spinner"></div>
+                        <span id="timerCount" class="timer-count">5</span>
+                    </div>
+
                     <div id="checkIcon" class="checkmark">✓</div>
                     <h2>REDIRECTING...</h2>
-                    <p id="statusMsg" class="sub">WE ARE TAKING YOU TO THE VERIFICATION PAGE. PLEASE WAIT...</p>
+                    <p id="statusMsg" class="sub">PLEASE WAIT WHILE WE PREPARE YOUR DESTINATION LINK...</p>
                     <button id="redirectBtn" class="btn hidden" onclick="goShortlink()">CLICK IF NOT REDIRECTED</button>
                     <p class="timer-text">DO NOT CLOSE THIS WINDOW.</p>
                 </div>
@@ -310,18 +336,21 @@ app.get('/verify', async (req, res) => {
                     document.getElementById('step2').classList.remove('hidden');
 
                     let seconds = 5;
-                    const statusMsg = document.getElementById('statusMsg');
+                    const timerCount = document.getElementById('timerCount');
+                    timerCount.innerText = seconds;
 
                     const timer = setInterval(() => {
-                        statusMsg.innerText = \`Verification link ready! Redirecting in \${seconds}s...\`;
                         seconds--;
+                        if (seconds >= 0) {
+                            timerCount.innerText = seconds;
+                        }
 
                         if (seconds < 0) {
                             clearInterval(timer);
-                            document.getElementById('loadingSpinner').style.display = 'none';
+                            document.getElementById('spinnerWrapper').style.display = 'none';
                             document.getElementById('checkIcon').style.display = 'block';
                             document.getElementById('redirectBtn').classList.remove('hidden');
-                            statusMsg.innerText = "Verification link ready!";
+                            document.getElementById('statusMsg').innerText = "Verification link ready!";
                             goShortlink();
                         }
                     }, 1000);
