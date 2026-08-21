@@ -14,19 +14,16 @@ const COOKIE_SECRET = process.env.COOKIE_SECRET || "super_secret_anti_bypass_key
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
 
-// Enable Trust Proxy for platforms like Render, Heroku, Cloudflare
 app.set('trust proxy', 1);
 
-// Middleware
 app.use(express.json());
-app.use(cookieParser(COOKIE_SECRET)); // Encrypted/Signed Cookies Support
+app.use(cookieParser(COOKIE_SECRET));
 
 let db;
 
-// 🛡️ Rate Limiter: DDoS और स्पैम अटैक से सुरक्षा
 const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, 
-    max: 30, 
+    max: 40, 
     message: { success: false, message: "Too many requests. Please slow down." }
 });
 
@@ -44,12 +41,10 @@ async function connectDB() {
     return db;
 }
 
-// Helper: Real Client IP निकालना
 function getClientIp(req) {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
 }
 
-// Keep-Alive / Health Check Routes
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
 app.get('/', (req, res) => res.status(200).send('Zender Proxy Server is Active'));
 
@@ -61,7 +56,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// 🔴 UI Template: Access Denied / Token Already Used
+// UI Template: Access Denied / Already Used
 function renderAccessDeniedUI(reasonText, titleText = "Verification Failed") {
     return `
     <!DOCTYPE html>
@@ -118,9 +113,9 @@ function renderAccessDeniedUI(reasonText, titleText = "Verification Failed") {
             <div class="badge-denied">[ ACCESS DENIED ]</div>
             <div class="status-icon">⚠️</div>
             <h1 class="title">${titleText}</h1>
-            <p class="subtitle">Access restricted by security gateway.</p>
+            <p class="subtitle">Security Gateway Protection.</p>
             <div class="reason-box">
-                <div class="reason-title">SYSTEM STATUS:</div>
+                <div class="reason-title">SYSTEM DIAGNOSTIC:</div>
                 <div class="reason-text">${reasonText}</div>
             </div>
             <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">🔄 GET NEW LINK</a>
@@ -150,15 +145,13 @@ app.get('/verify', apiLimiter, async (req, res) => {
         const cleanToken = token.trim();
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
-        // ❌ अगर टोकन डेटाबेस में है ही नहीं
         if (!tokenDoc) {
             return res.status(404).send(renderAccessDeniedUI("⚡ Invalid Token or Link Expired."));
         }
 
-        // ❌ अगर टोकन पहले ही यूज़ (Claim) हो चुका है (EXPLICIT CHECK)
         if (tokenDoc.is_used) {
             return res.status(403).send(
-                renderAccessDeniedUI("⚠️ LINK ALREADY USED! This verification token has already been completed and claimed. Please generate a new link from Telegram Bot.", "Token Already Used")
+                renderAccessDeniedUI("⚠️ LINK ALREADY USED! This verification token has already been claimed.", "Token Already Used")
             );
         }
 
@@ -177,39 +170,36 @@ app.get('/verify', apiLimiter, async (req, res) => {
                     background: #0b0f19; color: white;
                     font-family: 'Segoe UI', -apple-system, sans-serif;
                     display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden; position: relative;
+                    min-height: 100vh; overflow: hidden;
                 }
                 .card {
-                    position: relative; z-index: 2;
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
                     box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; color: #fff; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
+                h2 { font-size: 20px; margin-bottom: 8px; color: #fff; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; }
                 .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; }
                 .btn {
                     background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
-                    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
                 }
-                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
+                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
                 .hidden { display: none; }
                 .spinner-wrapper {
-                    position: relative; width: 65px; height: 65px;
-                    margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
+                    position: relative; width: 65px; height: 65px; margin: 0 auto 20px;
+                    display: flex; align-items: center; justify-content: center;
                 }
                 .spinner {
-                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                    position: absolute; width: 100%; height: 100%;
                     border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
                     border-radius: 50%; animation: spin 1s linear infinite;
                 }
                 .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
-                .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                .status { margin-top: 12px; color: #00f3ff; font-size: 13px; min-height: 18px; }
+                .status { margin-top: 12px; color: #00f3ff; font-size: 13px; }
             </style>
         </head>
         <body>
@@ -217,24 +207,20 @@ app.get('/verify', apiLimiter, async (req, res) => {
                 <div id="step1">
                     <h2>SECURE VERIFICATION</h2>
                     <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK 🎴</p>
-                    
                     <div class="turnstile-container">
                         <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-theme="dark" data-callback="onCaptchaSuccess"></div>
                     </div>
-
                     <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY NOW</button>
                     <div id="status" class="status">Please complete captcha above</div>
                 </div>
 
                 <div id="step2" class="hidden">
-                    <div id="spinnerWrapper" class="spinner-wrapper">
+                    <div class="spinner-wrapper">
                         <div class="spinner"></div>
-                        <span id="timerCount" class="timer-count">5</span>
+                        <span id="timerCount" class="timer-count">3</span>
                     </div>
-                    <div id="checkIcon" class="checkmark">✓</div>
                     <h2>REDIRECTING...</h2>
-                    <p id="statusMsg" class="sub">PLEASE WAIT WHILE WE PREPARE YOUR LINK...</p>
-                    <button id="redirectBtn" class="btn hidden" onclick="goShortlink()">CLICK IF NOT REDIRECTED</button>
+                    <p class="sub">PLEASE WAIT...</p>
                 </div>
             </div>
 
@@ -281,16 +267,13 @@ app.get('/verify', apiLimiter, async (req, res) => {
                     document.getElementById('step1').classList.add('hidden');
                     document.getElementById('step2').classList.remove('hidden');
 
-                    let seconds = 5;
+                    let seconds = 3;
                     const timerCount = document.getElementById('timerCount');
                     const timer = setInterval(() => {
                         seconds--;
                         if (seconds >= 0) timerCount.innerText = seconds;
                         if (seconds < 0) {
                             clearInterval(timer);
-                            document.getElementById('spinnerWrapper').style.display = 'none';
-                            document.getElementById('checkIcon').style.display = 'block';
-                            document.getElementById('redirectBtn').classList.remove('hidden');
                             goShortlink();
                         }
                     }, 1000);
@@ -298,12 +281,7 @@ app.get('/verify', apiLimiter, async (req, res) => {
 
                 function goShortlink() {
                     if (destinationUrl) {
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                            window.Telegram.WebApp.openLink(destinationUrl);
-                            window.Telegram.WebApp.close();
-                        } else {
-                            window.location.href = destinationUrl;
-                        }
+                        window.location.href = destinationUrl;
                     }
                 }
             </script>
@@ -317,7 +295,7 @@ app.get('/verify', apiLimiter, async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK & SET ENCRYPTED COOKIE
+// 2️⃣ STEP 2: GENERATE SHORTLINK
 // ----------------------------------------------------------------------
 app.get('/api/process-token', apiLimiter, async (req, res) => {
     const { token, cf_token } = req.query;
@@ -338,33 +316,19 @@ app.get('/api/process-token', apiLimiter, async (req, res) => {
         const cleanToken = token.trim();
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
-        if (!tokenDoc) {
-            return res.json({ success: false, message: "Invalid or non-existent token!" });
-        }
-
-        if (tokenDoc.is_used) {
-            return res.json({ success: false, message: "This link/token has ALREADY BEEN USED!" });
-        }
+        if (!tokenDoc) return res.json({ success: false, message: "Invalid or non-existent token!" });
+        if (tokenDoc.is_used) return res.json({ success: false, message: "This link has ALREADY BEEN USED!" });
 
         const clientIp = getClientIp(req);
-        const userAgent = req.headers['user-agent'] || 'unknown';
 
-        // 🛡️ Set Encrypted Cookie
-        res.cookie('v_session', cleanToken, {
-            httpOnly: true,
-            signed: true,
-            maxAge: 15 * 60 * 1000,
-            sameSite: 'lax'
-        });
-
-        // Save generation time and fingerprint
+        // Save timestamp and mark token verification initialized
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
             { 
                 $set: { 
                     generated_at: Date.now(),
                     created_ip: clientIp,
-                    created_ua: userAgent
+                    verified_step1: true
                 } 
             }
         );
@@ -407,10 +371,9 @@ app.get('/claim', apiLimiter, async (req, res) => {
 
         if (!tokenDoc) return res.status(404).send(renderAccessDeniedUI("⚡ Invalid or expired token."));
         
-        // ❌ अगर क्लेम पेज पर पहले से यूज़ किया टोकन खुले
         if (tokenDoc.is_used) {
             return res.status(403).send(
-                renderAccessDeniedUI("⚠️ LINK ALREADY CLAIMED! This token has already been redeemed in Telegram.", "Already Claimed")
+                renderAccessDeniedUI("⚠️ LINK ALREADY CLAIMED! This token has already been redeemed.", "Already Claimed")
             );
         }
 
@@ -449,7 +412,7 @@ app.get('/claim', apiLimiter, async (req, res) => {
                     display: flex; align-items: center; justify-content: center;
                 }
                 .spinner {
-                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                    position: absolute; width: 100%; height: 100%;
                     border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
                     border-radius: 50%; animation: spin 1s linear infinite;
                 }
@@ -467,15 +430,15 @@ app.get('/claim', apiLimiter, async (req, res) => {
                 <div id="checkStep">
                     <div class="spinner-wrapper">
                         <div class="spinner"></div>
-                        <span id="scanCount" class="timer-count">5</span>
+                        <span id="scanCount" class="timer-count">3</span>
                     </div>
                     <h2>VERIFYING SECURITY...</h2>
-                    <p class="sub">SCANNING FOR AUTOMATION & BYPASS BOTS...</p>
+                    <p class="sub">FINALIZING VERIFICATION...</p>
                 </div>
 
                 <div id="claimStep" class="hidden">
                     <h2 style="color:#10b981;">✓ VERIFICATION PASSED</h2>
-                    <p class="sub">CLICK BELOW TO RETURN TO TELEGRAM BOT</p>
+                    <p class="sub">CLICK BELOW TO CLAIM TOKEN IN TELEGRAM</p>
                     <button id="claimBtn" class="btn" onclick="executeClaim()">🎁 CLAIM YOUR TOKEN</button>
                 </div>
 
@@ -493,16 +456,14 @@ app.get('/claim', apiLimiter, async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
+                // Precise Bot Check (avoiding WebApp false positives)
                 function detectHeadlessBot() {
-                    const isWebDriver = navigator.webdriver || false;
+                    const isWebDriver = navigator.webdriver === true;
                     const isHeadlessUA = /HeadlessChrome|PhantomJS|Puppeteer/i.test(navigator.userAgent);
-                    const isZeroWindow = (window.outerWidth === 0 && window.outerHeight === 0);
-                    const missingLanguages = !navigator.languages || navigator.languages.length === 0;
-
-                    return isWebDriver || isHeadlessUA || isZeroWindow || missingLanguages;
+                    return isWebDriver || isHeadlessUA;
                 }
 
-                let scanSeconds = 5;
+                let scanSeconds = 3;
                 const scanCount = document.getElementById('scanCount');
                 
                 const scanTimer = setInterval(() => {
@@ -542,7 +503,7 @@ app.get('/claim', apiLimiter, async (req, res) => {
                         }
                     } catch(e) {
                         document.getElementById('checkStep').classList.add('hidden');
-                        document.getElementById('deniedReason').innerText = "Security Verification Failed.";
+                        document.getElementById('deniedReason').innerText = "Security Verification Error.";
                         document.getElementById('deniedStep').classList.remove('hidden');
                     }
                 }
@@ -578,28 +539,23 @@ app.post('/api/execute-claim', apiLimiter, async (req, res) => {
 
     try {
         const cleanToken = token.trim();
-        const clientIp = getClientIp(req);
 
         // 1. Check Token existence
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
         if (!tokenDoc) return res.json({ success: false, message: "Invalid or non-existent token." });
         
-        // 2. Double-check used status
+        // 2. Already used check
         if (tokenDoc.is_used) {
             return res.json({ success: false, message: "⚠️ LINK ALREADY USED! This token has already been claimed." });
         }
 
-        // 3. Encrypted HttpOnly Cookie Check
-        const sessionToken = req.signedCookies.v_session;
-        if (!sessionToken || sessionToken !== cleanToken) {
-            return res.json({ 
-                success: false, 
-                message: "BYPASS DETECTED: Missing Encrypted Browser Session Cookie! Script bypass blocked." 
-            });
+        // 3. Verify Step 1 was initiated
+        if (!tokenDoc.verified_step1) {
+            return res.json({ success: false, message: "BYPASS DETECTED: Step 1 Turnstile Captcha was skipped." });
         }
 
-        // 4. Headless Automation Check
+        // 4. Client-side Headless Automation Check
         if (isHeadlessBot === true) {
             return res.json({ 
                 success: false, 
@@ -607,18 +563,10 @@ app.post('/api/execute-claim', apiLimiter, async (req, res) => {
             });
         }
 
-        // 5. IP Mismatch Lock
-        if (tokenDoc.created_ip && tokenDoc.created_ip !== clientIp) {
-            return res.json({ 
-                success: false, 
-                message: "SECURITY ALERT: IP Mismatch! The IP address claiming this token does not match initial device." 
-            });
-        }
-
-        // 6. Time Limit Gate Check (60 Seconds Minimum)
+        // 5. Time Limit Gate Check (15 Seconds Minimum)
         const generatedAt = tokenDoc.generated_at || Date.now();
         const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
-        const MIN_REQUIRED_SECONDS = 60;
+        const MIN_REQUIRED_SECONDS = 15; // Realistically lowered from 60 to 15 seconds
 
         if (timeElapsedSeconds < MIN_REQUIRED_SECONDS) {
             return res.json({ 
@@ -627,14 +575,14 @@ app.post('/api/execute-claim', apiLimiter, async (req, res) => {
             });
         }
 
-        // 7. Atomic DB Update (Mark as Used)
+        // 6. Atomic DB Update (Mark as Used)
         const updateResult = await db.collection('verify_tokens').findOneAndUpdate(
             { token: cleanToken, is_used: false },
             { 
                 $set: { 
                     is_used: true, 
                     claimed_at: Date.now(),
-                    claimed_ip: clientIp 
+                    claimed_ip: getClientIp(req) 
                 } 
             },
             { returnDocument: 'after' }
@@ -643,9 +591,6 @@ app.post('/api/execute-claim', apiLimiter, async (req, res) => {
         if (!updateResult) {
             return res.json({ success: false, message: "Token has already been processed or claimed." });
         }
-
-        // Clear encrypted cookie
-        res.clearCookie('v_session');
 
         // Fetch Bot Username
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
