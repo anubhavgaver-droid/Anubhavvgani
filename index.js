@@ -1,7 +1,6 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const axios = require('axios');
-const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,16 +11,7 @@ const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
 
-app.set('trust proxy', 1);
-app.use(express.json());
-
 let db;
-
-const apiLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000,
-    max: 40,
-    message: { success: false, message: "Too many requests. Please slow down." }
-});
 
 async function connectDB() {
     if (!db) {
@@ -37,10 +27,7 @@ async function connectDB() {
     return db;
 }
 
-function getClientIp(req) {
-    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
-}
-
+// Keep-Alive / Health Check Routes
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
 app.get('/', (req, res) => res.status(200).send('Zender Proxy Server is Active'));
 
@@ -52,6 +39,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
+// Pure English Access Denied HUD Template Helper
 function renderAccessDeniedUI(reasonText) {
     return `
     <!DOCTYPE html>
@@ -63,9 +51,13 @@ function renderAccessDeniedUI(reasonText) {
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
             :root {
-                --bg-color: #07090e; --card-bg: rgba(13, 17, 23, 0.85);
-                --cyan-glow: #00f3ff; --red-glow: #ff0055; --red-dim: rgba(255, 0, 85, 0.15);
-                --text-main: #e6edf3; --text-sub: #8b949e;
+                --bg-color: #07090e;
+                --card-bg: rgba(13, 17, 23, 0.85);
+                --cyan-glow: #00f3ff;
+                --red-glow: #ff0055;
+                --red-dim: rgba(255, 0, 85, 0.15);
+                --text-main: #e6edf3;
+                --text-sub: #8b949e;
             }
             * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
             body {
@@ -127,9 +119,9 @@ function renderAccessDeniedUI(reasonText) {
 }
 
 // ----------------------------------------------------------------------
-// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE (/verify)
+// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE
 // ----------------------------------------------------------------------
-app.get('/verify', apiLimiter, async (req, res) => {
+app.get('/verify', async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
@@ -138,14 +130,13 @@ app.get('/verify', apiLimiter, async (req, res) => {
 
     try {
         const cleanToken = token.trim();
-        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
+        const tokenDoc = await db.collection('verify_tokens').findOne({ 
+            token: cleanToken, 
+            is_used: false 
+        });
 
         if (!tokenDoc) {
-            return res.status(404).send(renderAccessDeniedUI("⚡ Invalid or non-existent token."));
-        }
-
-        if (tokenDoc.is_used) {
-            return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been used or link expired."));
+            return res.status(403).send(renderAccessDeniedUI("⚡ Token has already been used or link expired."));
         }
 
         res.send(`
@@ -155,65 +146,84 @@ app.get('/verify', apiLimiter, async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Secure Verification</title>
+            
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+            
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
                     background: #0b0f19; color: white;
                     font-family: 'Segoe UI', -apple-system, sans-serif;
                     display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden;
+                    min-height: 100vh; overflow: hidden; position: relative;
                 }
+                #fogCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
                 .card {
+                    position: relative; z-index: 2;
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
                     box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 20px; margin-bottom: 8px; color: #fff; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; }
+                h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; color: #fff; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
                 .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; }
                 .btn {
                     background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
+                    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
                 }
-                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+                .btn:hover { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); transform: translateY(-1px); }
+                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
                 .hidden { display: none; }
+
                 .spinner-wrapper {
-                    position: relative; width: 65px; height: 65px; margin: 0 auto 20px;
-                    display: flex; align-items: center; justify-content: center;
+                    position: relative; width: 65px; height: 65px;
+                    margin: 0 auto 20px; display: flex;
+                    align-items: center; justify-content: center;
                 }
                 .spinner {
-                    position: absolute; width: 100%; height: 100%;
+                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                     border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
                     border-radius: 50%; animation: spin 1s linear infinite;
                 }
                 .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
+                .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                .status { margin-top: 12px; color: #00f3ff; font-size: 13px; }
+                .status { margin-top: 12px; color: #00f3ff; font-size: 13px; min-height: 18px; }
+                .timer-text { font-size: 12px; color: #64748b; margin-top: 15px; }
             </style>
         </head>
         <body>
+            <canvas id="fogCanvas"></canvas>
+
             <div class="card">
                 <div id="step1">
                     <h2>SECURE VERIFICATION</h2>
-                    <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK 🎴</p>
+                    <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK TO PROCEED 🎴</p>
+                    
                     <div class="turnstile-container">
                         <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-theme="dark" data-callback="onCaptchaSuccess"></div>
                     </div>
+
                     <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY NOW</button>
                     <div id="status" class="status">Please complete captcha above</div>
                 </div>
 
                 <div id="step2" class="hidden">
-                    <div class="spinner-wrapper">
+                    <div id="spinnerWrapper" class="spinner-wrapper">
                         <div class="spinner"></div>
-                        <span id="timerCount" class="timer-count">3</span>
+                        <span id="timerCount" class="timer-count">5</span>
                     </div>
+
+                    <div id="checkIcon" class="checkmark">✓</div>
                     <h2>REDIRECTING...</h2>
-                    <p class="sub">PLEASE WAIT...</p>
+                    <p id="statusMsg" class="sub">PLEASE WAIT WHILE WE PREPARE YOUR DESTINATION LINK...</p>
+                    <button id="redirectBtn" class="btn hidden" onclick="goShortlink()">CLICK IF NOT REDIRECTED</button>
+                    <p class="timer-text">DO NOT CLOSE THIS WINDOW.</p>
                 </div>
             </div>
 
@@ -222,6 +232,37 @@ app.get('/verify', apiLimiter, async (req, res) => {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
                 }
+
+                const canvas = document.getElementById('fogCanvas');
+                const ctx = canvas.getContext('2d');
+                function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                const particles = Array.from({ length: 60 }, () => ({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2.5 + 0.5,
+                    speedY: Math.random() * 0.8 + 0.2,
+                    speedX: Math.random() * 0.4 - 0.2,
+                    opacity: Math.random() * 0.6 + 0.2
+                }));
+
+                function animateParticles() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    particles.forEach(p => {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = \`rgba(0, 243, 255, \${p.opacity})\`;
+                        ctx.fill();
+                        p.y += p.speedY; p.x += p.speedX;
+                        if (p.y > canvas.height) p.y = 0;
+                        if (p.x > canvas.width) p.x = 0;
+                        if (p.x < 0) p.x = canvas.width;
+                    });
+                    requestAnimationFrame(animateParticles);
+                }
+                animateParticles();
 
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
@@ -236,7 +277,9 @@ app.get('/verify', apiLimiter, async (req, res) => {
                     if (!turnstileResponseToken) return alert("Please complete Captcha!");
 
                     const btn = document.getElementById('vBtn');
+                    const status = document.getElementById('status');
                     btn.disabled = true; btn.innerText = "INITIALIZING...";
+                    status.innerText = "Validating security check...";
 
                     try {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
@@ -252,6 +295,7 @@ app.get('/verify', apiLimiter, async (req, res) => {
                         }
                     } catch(e) {
                         alert("Network Error!");
+                        if (window.turnstile) window.turnstile.reset();
                         btn.disabled = true; btn.innerText = "VERIFY NOW";
                     }
                 }
@@ -260,13 +304,20 @@ app.get('/verify', apiLimiter, async (req, res) => {
                     document.getElementById('step1').classList.add('hidden');
                     document.getElementById('step2').classList.remove('hidden');
 
-                    let seconds = 3;
+                    let seconds = 5;
                     const timerCount = document.getElementById('timerCount');
+                    timerCount.innerText = seconds;
+
                     const timer = setInterval(() => {
                         seconds--;
                         if (seconds >= 0) timerCount.innerText = seconds;
+
                         if (seconds < 0) {
                             clearInterval(timer);
+                            document.getElementById('spinnerWrapper').style.display = 'none';
+                            document.getElementById('checkIcon').style.display = 'block';
+                            document.getElementById('redirectBtn').classList.remove('hidden');
+                            document.getElementById('statusMsg').innerText = "Verification link ready!";
                             goShortlink();
                         }
                     }, 1000);
@@ -274,7 +325,12 @@ app.get('/verify', apiLimiter, async (req, res) => {
 
                 function goShortlink() {
                     if (destinationUrl) {
-                        window.location.href = destinationUrl;
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                            window.Telegram.WebApp.openLink(destinationUrl);
+                            window.Telegram.WebApp.close();
+                        } else {
+                            window.location.href = destinationUrl;
+                        }
                     }
                 }
             </script>
@@ -288,12 +344,13 @@ app.get('/verify', apiLimiter, async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK & RECORD TIME
+// 2️⃣ STEP 2: GENERATE SHORTLINK & SAVE TIME
 // ----------------------------------------------------------------------
-app.get('/api/process-token', apiLimiter, async (req, res) => {
+app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
 
-    if (!token || !cf_token) return res.json({ success: false, message: "Missing required parameters." });
+    if (!token) return res.json({ success: false, message: "Token missing" });
+    if (!cf_token) return res.json({ success: false, message: "Captcha token missing" });
 
     try {
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -307,22 +364,16 @@ app.get('/api/process-token', apiLimiter, async (req, res) => {
         }
 
         const cleanToken = token.trim();
+
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken, is_used: false });
+        if (!tokenDoc) {
+            return res.json({ success: false, message: "Token already used or expired!" });
+        }
 
-        if (!tokenDoc) return res.json({ success: false, message: "Token already used or expired!" });
-
-        const clientIp = getClientIp(req);
-
-        // Mark Step 1 verified and save generated timestamp
+        // Record creation timestamp for 40-sec check
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { 
-                $set: { 
-                    generated_at: Date.now(),
-                    created_ip: clientIp,
-                    verified_step1: true
-                } 
-            }
+            { $set: { generated_at: Date.now() } }
         );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
@@ -330,6 +381,7 @@ app.get('/api/process-token', apiLimiter, async (req, res) => {
             return res.json({ success: false, message: "Shortener configuration missing." });
         }
 
+        // Target URL points to GATEKEEPER ENDPOINT (/claim)
         const hostUrl = req.protocol + '://' + req.get('host');
         const targetProxyUrl = `${hostUrl}/claim?token=${cleanToken}`;
 
@@ -350,23 +402,28 @@ app.get('/api/process-token', apiLimiter, async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: CLAIM GATEKEEPER PAGE (/claim)
+// 3️⃣ STEP 3: GATEKEEPER MINI APP PAGE (/claim)
 // ----------------------------------------------------------------------
-app.get('/claim', apiLimiter, async (req, res) => {
+app.get('/claim', async (req, res) => {
     const { token } = req.query;
 
-    if (!token) return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
+    if (!token) {
+        return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
+    }
 
     try {
         const cleanToken = token.trim();
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
-        if (!tokenDoc) return res.status(404).send(renderAccessDeniedUI("⚡ Invalid or expired verification token."));
+        if (!tokenDoc) {
+            return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired verification token."));
+        }
 
         if (tokenDoc.is_used) {
             return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
         }
 
+        // Render Mini App UI for Claiming
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -374,40 +431,51 @@ app.get('/claim', apiLimiter, async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Security Verification Gateway</title>
+            
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
+            
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
                     background: #0b0f19; color: white;
                     font-family: 'Segoe UI', -apple-system, sans-serif;
                     display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden;
+                    min-height: 100vh; overflow: hidden; position: relative;
                 }
+                #fogCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
                 .card {
+                    position: relative; z-index: 2;
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
                     box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 20px; color: #fff; margin-bottom: 8px; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; }
+                h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; color: #fff; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
                 .btn {
                     background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
+                    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
                 }
+                .btn:hover { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); transform: translateY(-1px); }
                 .hidden { display: none; }
+
                 .spinner-wrapper {
-                    position: relative; width: 65px; height: 65px; margin: 0 auto 20px;
-                    display: flex; align-items: center; justify-content: center;
+                    position: relative; width: 65px; height: 65px;
+                    margin: 0 auto 20px; display: flex;
+                    align-items: center; justify-content: center;
                 }
                 .spinner {
-                    position: absolute; width: 100%; height: 100%;
+                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                     border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
                     border-radius: 50%; animation: spin 1s linear infinite;
                 }
-                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; }
+                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
+                .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                
                 .denied-box {
                     background: rgba(255, 0, 85, 0.1); border: 1px solid #ff0055;
                     border-radius: 8px; padding: 15px; margin-bottom: 15px; color: #ff0055;
@@ -416,25 +484,31 @@ app.get('/claim', apiLimiter, async (req, res) => {
             </style>
         </head>
         <body>
+            <canvas id="fogCanvas"></canvas>
+
             <div class="card">
+                <!-- STEP 1: 5 SECONDS SECURITY CHECKING -->
                 <div id="checkStep">
                     <div class="spinner-wrapper">
                         <div class="spinner"></div>
-                        <span id="scanCount" class="timer-count">3</span>
+                        <span id="scanCount" class="timer-count">5</span>
                     </div>
                     <h2>VERIFYING SECURITY...</h2>
-                    <p class="sub">FINALIZING VERIFICATION...</p>
+                    <p class="sub">PLEASE WAIT WHILE WE SCAN HUMAN INTERACTION TIME...</p>
                 </div>
 
+                <!-- STEP 2A: SUCCESS CLAIM BUTTON -->
                 <div id="claimStep" class="hidden">
-                    <h2 style="color:#10b981;">✓ VERIFICATION PASSED</h2>
-                    <p class="sub">CLICK BELOW TO CLAIM TOKEN IN TELEGRAM</p>
+                    <div class="checkmark" style="display:block;">✓</div>
+                    <h2>VERIFICATION COMPLETE</h2>
+                    <p class="sub">CLICK BELOW TO CLAIM YOUR TOKEN AND RETURN TO BOT</p>
                     <button id="claimBtn" class="btn" onclick="executeClaim()">🎁 CLAIM YOUR TOKEN</button>
                 </div>
 
+                <!-- STEP 2B: BYPASS DETECTED DENIED -->
                 <div id="deniedStep" class="hidden">
-                    <div class="denied-box">[ ACCESS RESTRICTED ]</div>
-                    <h2>VERIFICATION FAILED</h2>
+                    <div class="denied-box">[ BYPASS BOT DETECTED ]</div>
+                    <h2>ACCESS RESTRICTED</h2>
                     <p id="deniedReason" class="sub" style="color:#ef4444;"></p>
                     <a href="https://t.me/SmartfilestorebyAcbot" class="btn" style="text-decoration:none; display:block;">🔄 GET NEW LINK</a>
                 </div>
@@ -446,7 +520,33 @@ app.get('/claim', apiLimiter, async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
-                let scanSeconds = 3;
+                // Fog Particle Animation
+                const canvas = document.getElementById('fogCanvas');
+                const ctx = canvas.getContext('2d');
+                function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                const particles = Array.from({ length: 60 }, () => ({
+                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+                    radius: Math.random() * 2.5 + 0.5, speedY: Math.random() * 0.8 + 0.2,
+                    speedX: Math.random() * 0.4 - 0.2, opacity: Math.random() * 0.6 + 0.2
+                }));
+
+                function animateParticles() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    particles.forEach(p => {
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = \`rgba(0, 243, 255, \${p.opacity})\`; ctx.fill();
+                        p.y += p.speedY; p.x += p.speedX;
+                        if (p.y > canvas.height) p.y = 0; if (p.x > canvas.width) p.x = 0; if (p.x < 0) p.x = canvas.width;
+                    });
+                    requestAnimationFrame(animateParticles);
+                }
+                animateParticles();
+
+                // 5-Seconds Scan Logic
+                let scanSeconds = 5;
                 const scanCount = document.getElementById('scanCount');
                 
                 const scanTimer = setInterval(() => {
@@ -455,13 +555,13 @@ app.get('/claim', apiLimiter, async (req, res) => {
 
                     if (scanSeconds < 0) {
                         clearInterval(scanTimer);
-                        verifyMinTimeGate();
+                        verify40SecGate();
                     }
                 }, 1000);
 
                 let finalBotUrl = "";
 
-                async function verifyMinTimeGate() {
+                async function verify40SecGate() {
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}\`);
                         const data = await res.json();
@@ -483,27 +583,13 @@ app.get('/claim', apiLimiter, async (req, res) => {
                 }
 
                 function executeClaim() {
-                    if (!finalBotUrl) return;
-
-                    const isInsideTelegramApp = !!(
-                        window.Telegram && 
-                        window.Telegram.WebApp && 
-                        window.Telegram.WebApp.initData && 
-                        window.Telegram.WebApp.initData.length > 0
-                    );
-
-                    if (isInsideTelegramApp) {
-                        if (window.Telegram.WebApp.openTelegramLink) {
-                            window.Telegram.WebApp.openTelegramLink(finalBotUrl);
-                        } else {
+                    if (finalBotUrl) {
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
                             window.Telegram.WebApp.openLink(finalBotUrl);
+                            window.Telegram.WebApp.close();
+                        } else {
+                            window.location.href = finalBotUrl;
                         }
-
-                        setTimeout(() => {
-                            try { window.Telegram.WebApp.close(); } catch(e) {}
-                        }, 300);
-                    } else {
-                        window.location.href = finalBotUrl;
                     }
                 }
             </script>
@@ -520,15 +606,13 @@ app.get('/claim', apiLimiter, async (req, res) => {
 // ----------------------------------------------------------------------
 // 4️⃣ STEP 4: BACKEND GATE CHECK API (/api/execute-claim)
 // ----------------------------------------------------------------------
-app.get('/api/execute-claim', apiLimiter, async (req, res) => {
+app.get('/api/execute-claim', async (req, res) => {
     const { token } = req.query;
 
     if (!token) return res.json({ success: false, message: "Token parameter missing." });
 
     try {
         const cleanToken = token.trim();
-        const clientIp = getClientIp(req);
-
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
         if (!tokenDoc) {
@@ -539,40 +623,24 @@ app.get('/api/execute-claim', apiLimiter, async (req, res) => {
             return res.json({ success: false, message: "Token has already been claimed." });
         }
 
-        // Check if Step 1 Captcha was passed
-        if (!tokenDoc.verified_step1) {
-            return res.json({ success: false, message: "BYPASS DETECTED: Step 1 Turnstile Captcha was skipped." });
-        }
-
-        // Realistic Minimum Elapsed Time Gate (15 Seconds)
         const generatedAt = tokenDoc.generated_at || Date.now();
         const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
-        const MIN_REQUIRED_SECONDS = 15;
 
-        if (timeElapsedSeconds < MIN_REQUIRED_SECONDS) {
+        // ⏱️ MINIMUM 40 SECONDS SECURITY CHECK
+        if (timeElapsedSeconds < 60) {
             return res.json({ 
                 success: false, 
-                message: `BYPASS DETECTED! Completed in ${timeElapsedSeconds}s. Minimum required time is ${MIN_REQUIRED_SECONDS} seconds.` 
+                message: `BYPASS DETECTED! You completed verification in ${timeElapsedSeconds}s. Minimum required time is 40 seconds.` 
             });
         }
 
-        // Atomic Lock (Mark token as used)
-        const updateResult = await db.collection('verify_tokens').findOneAndUpdate(
-            { token: cleanToken, is_used: false },
-            { 
-                $set: { 
-                    is_used: true, 
-                    claimed_at: Date.now(),
-                    claimed_ip: clientIp 
-                } 
-            },
-            { returnDocument: 'after' }
+        // Mark token as used
+        await db.collection('verify_tokens').updateOne(
+            { token: cleanToken },
+            { $set: { is_used: true } }
         );
 
-        if (!updateResult) {
-            return res.json({ success: false, message: "Token has already been processed or claimed." });
-        }
-
+        // Fetch Bot Username
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
         let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
         const botUsername = rawBotUsername.replace(/^@/, '');
