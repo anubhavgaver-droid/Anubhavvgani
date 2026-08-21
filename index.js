@@ -28,7 +28,6 @@ async function connectDB() {
     return db;
 }
 
-// Keep-Alive / Health Check Routes
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
 app.get('/', (req, res) => res.status(200).send('Zender Proxy Server is Active'));
 
@@ -40,7 +39,6 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Access Denied HUD Template Helper
 function renderAccessDeniedUI(reasonText) {
     return `
     <!DOCTYPE html>
@@ -153,9 +151,7 @@ app.get('/verify', async (req, res) => {
                     display: flex; justify-content: center; align-items: center;
                     min-height: 100vh; overflow: hidden; position: relative;
                 }
-                #fogCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
                 .card {
-                    position: relative; z-index: 2;
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
@@ -186,7 +182,6 @@ app.get('/verify', async (req, res) => {
             </style>
         </head>
         <body>
-            <canvas id="fogCanvas"></canvas>
             <div class="card">
                 <div id="step1">
                     <h2>SECURE VERIFICATION</h2>
@@ -199,12 +194,12 @@ app.get('/verify', async (req, res) => {
                 </div>
 
                 <div id="step2" class="hidden">
-                    <div id="spinnerWrapper" class="spinner-wrapper">
+                    <div class="spinner-wrapper">
                         <div class="spinner"></div>
                         <span id="timerCount" class="timer-count">3</span>
                     </div>
                     <h2>REDIRECTING...</h2>
-                    <p id="statusMsg" class="sub">PLEASE WAIT WHILE WE PREPARE DESTINATION...</p>
+                    <p id="statusMsg" class="sub">PREPARING SHORTLINK DESTINATION...</p>
                 </div>
             </div>
 
@@ -213,30 +208,6 @@ app.get('/verify', async (req, res) => {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
                 }
-
-                const canvas = document.getElementById('fogCanvas');
-                const ctx = canvas.getContext('2d');
-                function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-                resizeCanvas();
-                window.addEventListener('resize', resizeCanvas);
-
-                const particles = Array.from({ length: 60 }, () => ({
-                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-                    radius: Math.random() * 2.5 + 0.5, speedY: Math.random() * 0.8 + 0.2,
-                    speedX: Math.random() * 0.4 - 0.2, opacity: Math.random() * 0.6 + 0.2
-                }));
-
-                function animateParticles() {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    particles.forEach(p => {
-                        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                        ctx.fillStyle = \`rgba(0, 243, 255, \${p.opacity})\`; ctx.fill();
-                        p.y += p.speedY; p.x += p.speedX;
-                        if (p.y > canvas.height) p.y = 0; if (p.x > canvas.width) p.x = 0;
-                    });
-                    requestAnimationFrame(animateParticles);
-                }
-                animateParticles();
 
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
@@ -333,10 +304,9 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // Initialize completion tracking
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { generated_at: Date.now(), is_completed: false } }
+            { $set: { generated_at: Date.now(), is_completed: false, gate_passed: false } }
         );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
@@ -345,9 +315,9 @@ app.get('/api/process-token', async (req, res) => {
         }
 
         const hostUrl = req.protocol + '://' + req.get('host');
-        const targetProxyUrl = `${hostUrl}/claim?token=${cleanToken}`;
+        // शॉर्टलिंक का फाइनल टारगेट अब /gate रहेगा (/claim नहीं)
+        const targetProxyUrl = `${hostUrl}/gate?token=${cleanToken}`;
 
-        // Send alias/token for postback identification
         const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}&alias=${cleanToken}`;
         const response = await axios.get(shortenerApiUrl);
         
@@ -365,9 +335,9 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: GATEKEEPER PAGE WITH INVISIBLE CAPTCHA (/claim)
+// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (न्यू इमिटेटर/फिल्टर)
 // ----------------------------------------------------------------------
-app.get('/claim', async (req, res) => {
+app.get('/gate', async (req, res) => {
     const { token } = req.query;
 
     if (!token) return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
@@ -390,7 +360,151 @@ app.get('/claim', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Security Verification Gateway</title>
+            <title>Anti-Bypass Inspection</title>
+            <script src="https://telegram.org/js/telegram-web-app.js"></script>
+            <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body {
+                    background: #07090e; color: white;
+                    font-family: 'Segoe UI', -apple-system, sans-serif;
+                    display: flex; justify-content: center; align-items: center;
+                    min-height: 100vh; overflow: hidden;
+                }
+                .card {
+                    background: rgba(13, 17, 23, 0.9); backdrop-filter: blur(16px);
+                    border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
+                    padding: 30px 24px; text-align: center; width: 90%; max-width: 380px;
+                    box-shadow: 0 0 30px rgba(0, 243, 255, 0.15);
+                }
+                h2 { font-size: 18px; color: #00f3ff; margin-bottom: 6px; letter-spacing: 1px; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 20px; }
+                .progress-bar {
+                    width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+                    border-radius: 4px; overflow: hidden; margin-bottom: 15px; position: relative;
+                }
+                .fill { width: 0%; height: 100%; background: #00f3ff; transition: width 0.1s linear; }
+                .status-log { font-size: 11px; color: #10b981; font-family: monospace; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2>🔍 INSPECTING TRAFFIC...</h2>
+                <p class="sub">Analyzing browser environment & human signals...</p>
+                <div class="progress-bar"><div id="progress" class="fill"></div></div>
+                <div id="log" class="status-log">Checking Headless Drivers...</div>
+            </div>
+
+            <script>
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+
+                // Browser Fingerprinting Check (Bot Detection)
+                function isBot() {
+                    const isHeadless = navigator.webdriver || !navigator.languages || navigator.languages.length === 0;
+                    const hasInvalidScreen = window.outerWidth === 0 && window.outerHeight === 0;
+                    return isHeadless || hasInvalidScreen;
+                }
+
+                let percent = 0;
+                const progress = document.getElementById('progress');
+                const log = document.getElementById('log');
+
+                const interval = setInterval(() => {
+                    percent += 5;
+                    progress.style.width = percent + '%';
+
+                    if (percent === 30) log.innerText = "Verifying Screen Resolution & Touch API...";
+                    if (percent === 70) log.innerText = "Establishing Anti-Bypass Handshake...";
+
+                    if (percent >= 100) {
+                        clearInterval(interval);
+                        if (isBot()) {
+                            alert("Bypass Bot Detected!");
+                            return;
+                        }
+                        passGate();
+                    }
+                }, 100);
+
+                async function passGate() {
+                    try {
+                        const res = await fetch(\`/api/pass-gate?token=${cleanToken}\`);
+                        const data = await res.json();
+                        if (data.success) {
+                            window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
+                        } else {
+                            alert(data.message || "Security Inspection Failed.");
+                        }
+                    } catch(e) {
+                        alert("Gate connection error.");
+                    }
+                }
+            </script>
+        </body>
+        </html>
+        `);
+    } catch (err) {
+        console.error("Gate Route Error:", err);
+        return res.status(500).send(renderAccessDeniedUI("Gate Security Check Error."));
+    }
+});
+
+// Gate Verification Handshake API
+app.get('/api/pass-gate', async (req, res) => {
+    const { token } = req.query;
+    if (!token) return res.json({ success: false, message: "Missing token." });
+
+    try {
+        const cleanToken = token.trim();
+        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
+
+        if (!tokenDoc || tokenDoc.is_used) {
+            return res.json({ success: false, message: "Invalid token." });
+        }
+
+        // Generate dynamic Hash
+        const hash = Buffer.from(`${cleanToken}_GATE_PASSED_${Date.now()}`).toString('base64');
+
+        await db.collection('verify_tokens').updateOne(
+            { token: cleanToken },
+            { $set: { gate_passed: true, gate_hash: hash, gate_time: Date.now() } }
+        );
+
+        return res.json({ success: true, hash });
+    } catch(e) {
+        return res.json({ success: false, message: "Gate pass failed." });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 4️⃣ STEP 4: CLAIM PAGE (गेट पास होने के बाद ही खुलेगा)
+// ----------------------------------------------------------------------
+app.get('/claim', async (req, res) => {
+    const { token, hash } = req.query;
+
+    if (!token || !hash) return res.status(400).send(renderAccessDeniedUI("🚫 Direct access strictly blocked. Complete verification process first."));
+
+    try {
+        const cleanToken = token.trim();
+        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
+
+        if (!tokenDoc) return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired token."));
+        if (tokenDoc.is_used) return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
+
+        // strict hash match
+        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash) {
+            return res.status(403).send(renderAccessDeniedUI("🛡️ BYPASS DETECTED: Intermediate gate security bypassed."));
+        }
+
+        res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Claim Gateway</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
@@ -399,7 +513,7 @@ app.get('/claim', async (req, res) => {
                     background: #0b0f19; color: white;
                     font-family: 'Segoe UI', -apple-system, sans-serif;
                     display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden; position: relative;
+                    min-height: 100vh; overflow: hidden;
                 }
                 .card {
                     background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
@@ -414,7 +528,6 @@ app.get('/claim', async (req, res) => {
                     color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
                 }
-                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
                 .hidden { display: none; }
                 .spinner-wrapper {
                     position: relative; width: 65px; height: 65px; margin: 0 auto 20px;
@@ -444,7 +557,6 @@ app.get('/claim', async (req, res) => {
                     <h2>VERIFYING TASK...</h2>
                     <p class="sub">VERIFYING COMPLETION WITH SECURITY GATEWAY...</p>
                     
-                    <!-- Invisible Turnstile Widget (Auto Pass in background) -->
                     <div class="cf-turnstile" 
                          data-sitekey="${TURNSTILE_SITE_KEY}" 
                          data-theme="dark" 
@@ -494,7 +606,7 @@ app.get('/claim', async (req, res) => {
 
                 async function verifyTaskCompletion() {
                     try {
-                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
+                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
                         const data = await res.json();
 
                         document.getElementById('checkStep').classList.add('hidden');
@@ -535,36 +647,33 @@ app.get('/claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 4️⃣ STEP 4: BACKEND GATE CHECK API WITH CAPTCHA & REFERRER CHECK (/api/execute-claim)
+// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK (/api/execute-claim)
 // ----------------------------------------------------------------------
 app.get('/api/execute-claim', async (req, res) => {
-    const { token, cf_token } = req.query;
+    const { token, hash, cf_token } = req.query;
 
-    if (!token) return res.json({ success: false, message: "Token parameter missing." });
+    if (!token || !hash) return res.json({ success: false, message: "Token/Hash missing." });
 
     try {
         const cleanToken = token.trim();
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
-        if (!tokenDoc) {
-            return res.json({ success: false, message: "Invalid or expired token." });
+        if (!tokenDoc || tokenDoc.is_used) {
+            return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        if (tokenDoc.is_used) {
-            return res.json({ success: false, message: "Token has already been claimed." });
+        // 🛡️ 1. Gate Hash verification
+        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash) {
+            return res.json({ success: false, message: "BYPASS DETECTED! Intermediary gate skipped." });
         }
 
-        // 🛡️ 1. Referrer Check (अगर direct hit या bot होगा तो Referer नहीं होगा)
-        const referer = req.get('Referer') || '';
-        const host = req.get('host');
-        if (!referer.includes(host)) {
-            return res.json({
-                success: false,
-                message: "BYPASS DETECTED! Direct API request strictly prohibited."
-            });
+        // 🛡️ 2. Minimum Time Gap Check (3 सेकंड से पहले रिक्वेस्ट आई तो बोट माना जाएगा)
+        const gateTimeDiff = Date.now() - (tokenDoc.gate_time || 0);
+        if (gateTimeDiff < 2500) {
+            return res.json({ success: false, message: "BYPASS DETECTED! Unnaturally fast execution speed." });
         }
 
-        // 🛡️ 2. Turnstile Captcha Check on Claim Step
+        // 🛡️ 3. Turnstile Captcha Check
         if (cf_token) {
             const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
             const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
@@ -574,19 +683,6 @@ app.get('/api/execute-claim', async (req, res) => {
 
             if (!cfResponse.data.success) {
                 return res.json({ success: false, message: "Security Captcha verification failed!" });
-            }
-        }
-
-        // 🛡️ 3. Webhook Check (अगर Postback है तो इसे प्राथमिकता मिलेगी, वरना ऊपर के 2 चेक रोकेंगे)
-        if (tokenDoc.is_completed === false) {
-            // अगर पोस्टबैक नहीं आया है तो भी ऊपर का Captcha + Referer चेक बोट्स को ब्लॉक कर देगा
-            // लेकिन सुरक्षा के लिए हम चेक करते हैं कि कम से कम 10 सेकंड का गैप रहा हो
-            const timeDiff = Date.now() - (tokenDoc.generated_at || 0);
-            if (timeDiff < 5000) { // 5 सेकंड से कम का मतलब बोट ने बायपास किया
-                return res.json({
-                    success: false,
-                    message: "BYPASS DETECTED! Unnaturally fast request."
-                });
             }
         }
 
@@ -611,32 +707,22 @@ app.get('/api/execute-claim', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 5️⃣ STEP 5: SHORTLINK WEBHOOK / POSTBACK RECEIVER API
+// 6️⃣ STEP 6: POSTBACK RECEIVER (IF AVAILABLE)
 // ----------------------------------------------------------------------
 app.get('/api/postback', async (req, res) => {
     const { token, secret } = req.query;
 
-    // Secret Key validation
-    if (secret !== POSTBACK_SECRET) {
-        return res.status(401).send("Unauthorized Access");
-    }
-
-    if (!token) {
-        return res.status(400).send("Missing token parameter");
-    }
+    if (secret !== POSTBACK_SECRET) return res.status(401).send("Unauthorized Access");
+    if (!token) return res.status(400).send("Missing token parameter");
 
     try {
         const cleanToken = token.trim();
-
-        // Mark token as completed by shortener
         const updateResult = await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
             { $set: { is_completed: true, postback_at: Date.now() } }
         );
 
-        if (updateResult.matchedCount === 0) {
-            return res.status(404).send("Token not found");
-        }
+        if (updateResult.matchedCount === 0) return res.status(404).send("Token not found");
 
         console.log(`✅ Webhook Received Successfully for Token: ${cleanToken}`);
         return res.status(200).send("OK");
