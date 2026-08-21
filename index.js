@@ -2,28 +2,24 @@ const express = require('express');
 const { MongoClient } = require('mongodb');
 const axios = require('axios');
 const rateLimit = require('express-rate-limit');
-const cookieParser = require('cookie-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI; 
 
 const DB_NAME = process.env.DB_NAME || "Cluovvoo";
-const COOKIE_SECRET = process.env.COOKIE_SECRET || "super_secret_anti_bypass_key_123890";
 
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
 
 app.set('trust proxy', 1);
-
 app.use(express.json());
-app.use(cookieParser(COOKIE_SECRET));
 
 let db;
 
 const apiLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, 
-    max: 40, 
+    windowMs: 1 * 60 * 1000,
+    max: 40,
     message: { success: false, message: "Too many requests. Please slow down." }
 });
 
@@ -56,8 +52,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// UI Template: Access Denied / Already Used
-function renderAccessDeniedUI(reasonText, titleText = "Verification Failed") {
+function renderAccessDeniedUI(reasonText) {
     return `
     <!DOCTYPE html>
     <html lang="en">
@@ -112,8 +107,8 @@ function renderAccessDeniedUI(reasonText, titleText = "Verification Failed") {
         <div class="hud-card">
             <div class="badge-denied">[ ACCESS DENIED ]</div>
             <div class="status-icon">⚠️</div>
-            <h1 class="title">${titleText}</h1>
-            <p class="subtitle">Security Gateway Protection.</p>
+            <h1 class="title">Verification Failed</h1>
+            <p class="subtitle">Access restricted by security protocols.</p>
             <div class="reason-box">
                 <div class="reason-title">SYSTEM DIAGNOSTIC:</div>
                 <div class="reason-text">${reasonText}</div>
@@ -132,7 +127,7 @@ function renderAccessDeniedUI(reasonText, titleText = "Verification Failed") {
 }
 
 // ----------------------------------------------------------------------
-// 1️⃣ STEP 1: VERIFICATION PAGE (/verify)
+// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE (/verify)
 // ----------------------------------------------------------------------
 app.get('/verify', apiLimiter, async (req, res) => {
     const { token } = req.query;
@@ -146,13 +141,11 @@ app.get('/verify', apiLimiter, async (req, res) => {
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
         if (!tokenDoc) {
-            return res.status(404).send(renderAccessDeniedUI("⚡ Invalid Token or Link Expired."));
+            return res.status(404).send(renderAccessDeniedUI("⚡ Invalid or non-existent token."));
         }
 
         if (tokenDoc.is_used) {
-            return res.status(403).send(
-                renderAccessDeniedUI("⚠️ LINK ALREADY USED! This verification token has already been claimed.", "Token Already Used")
-            );
+            return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been used or link expired."));
         }
 
         res.send(`
@@ -295,12 +288,12 @@ app.get('/verify', apiLimiter, async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK
+// 2️⃣ STEP 2: GENERATE SHORTLINK & RECORD TIME
 // ----------------------------------------------------------------------
 app.get('/api/process-token', apiLimiter, async (req, res) => {
     const { token, cf_token } = req.query;
 
-    if (!token || !cf_token) return res.json({ success: false, message: "Missing required parameters" });
+    if (!token || !cf_token) return res.json({ success: false, message: "Missing required parameters." });
 
     try {
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -314,14 +307,13 @@ app.get('/api/process-token', apiLimiter, async (req, res) => {
         }
 
         const cleanToken = token.trim();
-        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
+        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken, is_used: false });
 
-        if (!tokenDoc) return res.json({ success: false, message: "Invalid or non-existent token!" });
-        if (tokenDoc.is_used) return res.json({ success: false, message: "This link has ALREADY BEEN USED!" });
+        if (!tokenDoc) return res.json({ success: false, message: "Token already used or expired!" });
 
         const clientIp = getClientIp(req);
 
-        // Save timestamp and mark token verification initialized
+        // Mark Step 1 verified and save generated timestamp
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
             { 
@@ -369,12 +361,10 @@ app.get('/claim', apiLimiter, async (req, res) => {
         const cleanToken = token.trim();
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
-        if (!tokenDoc) return res.status(404).send(renderAccessDeniedUI("⚡ Invalid or expired token."));
-        
+        if (!tokenDoc) return res.status(404).send(renderAccessDeniedUI("⚡ Invalid or expired verification token."));
+
         if (tokenDoc.is_used) {
-            return res.status(403).send(
-                renderAccessDeniedUI("⚠️ LINK ALREADY CLAIMED! This token has already been redeemed.", "Already Claimed")
-            );
+            return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
         }
 
         res.send(`
@@ -456,13 +446,6 @@ app.get('/claim', apiLimiter, async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
-                // Precise Bot Check (avoiding WebApp false positives)
-                function detectHeadlessBot() {
-                    const isWebDriver = navigator.webdriver === true;
-                    const isHeadlessUA = /HeadlessChrome|PhantomJS|Puppeteer/i.test(navigator.userAgent);
-                    return isWebDriver || isHeadlessUA;
-                }
-
                 let scanSeconds = 3;
                 const scanCount = document.getElementById('scanCount');
                 
@@ -479,17 +462,8 @@ app.get('/claim', apiLimiter, async (req, res) => {
                 let finalBotUrl = "";
 
                 async function verifyMinTimeGate() {
-                    const isAutomatedBot = detectHeadlessBot();
-
                     try {
-                        const res = await fetch(\`/api/execute-claim\`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                token: "${cleanToken}",
-                                isHeadlessBot: isAutomatedBot
-                            })
-                        });
+                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}\`);
                         const data = await res.json();
 
                         document.getElementById('checkStep').classList.add('hidden');
@@ -503,19 +477,33 @@ app.get('/claim', apiLimiter, async (req, res) => {
                         }
                     } catch(e) {
                         document.getElementById('checkStep').classList.add('hidden');
-                        document.getElementById('deniedReason').innerText = "Security Verification Error.";
+                        document.getElementById('deniedReason').innerText = "Network verification error.";
                         document.getElementById('deniedStep').classList.remove('hidden');
                     }
                 }
 
                 function executeClaim() {
-                    if (finalBotUrl) {
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                            window.Telegram.WebApp.openLink(finalBotUrl);
-                            window.Telegram.WebApp.close();
+                    if (!finalBotUrl) return;
+
+                    const isInsideTelegramApp = !!(
+                        window.Telegram && 
+                        window.Telegram.WebApp && 
+                        window.Telegram.WebApp.initData && 
+                        window.Telegram.WebApp.initData.length > 0
+                    );
+
+                    if (isInsideTelegramApp) {
+                        if (window.Telegram.WebApp.openTelegramLink) {
+                            window.Telegram.WebApp.openTelegramLink(finalBotUrl);
                         } else {
-                            window.location.href = finalBotUrl;
+                            window.Telegram.WebApp.openLink(finalBotUrl);
                         }
+
+                        setTimeout(() => {
+                            try { window.Telegram.WebApp.close(); } catch(e) {}
+                        }, 300);
+                    } else {
+                        window.location.href = finalBotUrl;
                     }
                 }
             </script>
@@ -532,41 +520,34 @@ app.get('/claim', apiLimiter, async (req, res) => {
 // ----------------------------------------------------------------------
 // 4️⃣ STEP 4: BACKEND GATE CHECK API (/api/execute-claim)
 // ----------------------------------------------------------------------
-app.post('/api/execute-claim', apiLimiter, async (req, res) => {
-    const { token, isHeadlessBot } = req.body || {};
+app.get('/api/execute-claim', apiLimiter, async (req, res) => {
+    const { token } = req.query;
 
     if (!token) return res.json({ success: false, message: "Token parameter missing." });
 
     try {
         const cleanToken = token.trim();
+        const clientIp = getClientIp(req);
 
-        // 1. Check Token existence
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
-        if (!tokenDoc) return res.json({ success: false, message: "Invalid or non-existent token." });
-        
-        // 2. Already used check
-        if (tokenDoc.is_used) {
-            return res.json({ success: false, message: "⚠️ LINK ALREADY USED! This token has already been claimed." });
+        if (!tokenDoc) {
+            return res.json({ success: false, message: "Invalid or expired token." });
         }
 
-        // 3. Verify Step 1 was initiated
+        if (tokenDoc.is_used) {
+            return res.json({ success: false, message: "Token has already been claimed." });
+        }
+
+        // Check if Step 1 Captcha was passed
         if (!tokenDoc.verified_step1) {
             return res.json({ success: false, message: "BYPASS DETECTED: Step 1 Turnstile Captcha was skipped." });
         }
 
-        // 4. Client-side Headless Automation Check
-        if (isHeadlessBot === true) {
-            return res.json({ 
-                success: false, 
-                message: "BYPASS DETECTED: Automated Headless Browser / Script detected." 
-            });
-        }
-
-        // 5. Time Limit Gate Check (15 Seconds Minimum)
+        // Realistic Minimum Elapsed Time Gate (15 Seconds)
         const generatedAt = tokenDoc.generated_at || Date.now();
         const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
-        const MIN_REQUIRED_SECONDS = 15; // Realistically lowered from 60 to 15 seconds
+        const MIN_REQUIRED_SECONDS = 15;
 
         if (timeElapsedSeconds < MIN_REQUIRED_SECONDS) {
             return res.json({ 
@@ -575,14 +556,14 @@ app.post('/api/execute-claim', apiLimiter, async (req, res) => {
             });
         }
 
-        // 6. Atomic DB Update (Mark as Used)
+        // Atomic Lock (Mark token as used)
         const updateResult = await db.collection('verify_tokens').findOneAndUpdate(
             { token: cleanToken, is_used: false },
             { 
                 $set: { 
                     is_used: true, 
                     claimed_at: Date.now(),
-                    claimed_ip: getClientIp(req) 
+                    claimed_ip: clientIp 
                 } 
             },
             { returnDocument: 'after' }
@@ -592,7 +573,6 @@ app.post('/api/execute-claim', apiLimiter, async (req, res) => {
             return res.json({ success: false, message: "Token has already been processed or claimed." });
         }
 
-        // Fetch Bot Username
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
         let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
         const botUsername = rawBotUsername.replace(/^@/, '');
