@@ -11,7 +11,7 @@ const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
-const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "MY_SUPER_SECRET_KEY_123";
+const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "Zender_Secret_Pass_8921";
 
 let db;
 
