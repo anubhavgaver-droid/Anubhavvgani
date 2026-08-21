@@ -27,9 +27,7 @@ async function connectDB() {
     return db;
 }
 
-// ----------------------------------------------------------------------
-// 🛠️ KEEP-ALIVE / HEALTH CHECK ROUTES
-// ----------------------------------------------------------------------
+// Keep-Alive / Health Check Routes
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
 app.get('/', (req, res) => res.status(200).send('Zender Proxy Server is Active'));
 
@@ -41,7 +39,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Pure English Access Denied HUD Template
+// Pure English Access Denied HUD Template Helper
 function renderAccessDeniedUI(reasonText) {
     return `
     <!DOCTYPE html>
@@ -50,6 +48,7 @@ function renderAccessDeniedUI(reasonText) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Access Denied - Security Gateway</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
             :root {
                 --bg-color: #07090e;
@@ -62,23 +61,13 @@ function renderAccessDeniedUI(reasonText) {
             }
             * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
             body {
-                background-color: var(--bg-color);
-                color: var(--text-main);
+                background-color: var(--bg-color); color: var(--text-main);
                 display: flex; justify-content: center; align-items: center;
                 min-height: 100vh; padding: 20px; overflow: hidden;
-                background-image: 
-                    radial-gradient(circle at 50% 20%, rgba(0, 243, 255, 0.08) 0%, transparent 60%),
-                    radial-gradient(circle at 80% 80%, rgba(255, 0, 85, 0.05) 0%, transparent 50%);
-            }
-            .cyan-glow-orb {
-                position: absolute; width: 300px; height: 300px;
-                background: var(--cyan-glow); filter: blur(140px);
-                opacity: 0.18; pointer-events: none; z-index: 0;
             }
             .hud-card {
                 position: relative; z-index: 1; width: 100%; max-width: 400px;
                 background: var(--card-bg); backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
                 border: 1px solid rgba(0, 243, 255, 0.25); border-radius: 16px;
                 padding: 28px 24px; text-align: center;
                 box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
@@ -87,10 +76,9 @@ function renderAccessDeniedUI(reasonText) {
                 display: inline-block; padding: 6px 14px; border-radius: 20px;
                 font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
                 background: var(--red-dim); border: 1px solid var(--red-glow);
-                color: var(--red-glow); box-shadow: 0 0 12px rgba(255, 0, 85, 0.3);
-                margin-bottom: 20px;
+                color: var(--red-glow); margin-bottom: 20px;
             }
-            .status-icon { font-size: 42px; margin-bottom: 12px; filter: drop-shadow(0 0 10px var(--red-glow)); }
+            .status-icon { font-size: 42px; margin-bottom: 12px; }
             .title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 8px; }
             .subtitle { font-size: 13px; color: var(--text-sub); margin-bottom: 22px; line-height: 1.5; }
             .reason-box {
@@ -103,32 +91,36 @@ function renderAccessDeniedUI(reasonText) {
                 display: block; width: 100%; padding: 12px; border-radius: 8px;
                 background: linear-gradient(135deg, rgba(0, 243, 255, 0.2) 0%, rgba(0, 243, 255, 0.05) 100%);
                 border: 1px solid var(--cyan-glow); color: var(--cyan-glow);
-                font-weight: 600; font-size: 14px; text-decoration: none;
-                transition: 0.3s ease; box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+                font-weight: 600; font-size: 14px; text-decoration: none; transition: 0.3s ease;
             }
-            .btn-action:hover { background: var(--cyan-glow); color: #000; box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); }
         </style>
     </head>
     <body>
-        <div class="cyan-glow-orb"></div>
         <div class="hud-card">
             <div class="badge-denied">[ ACCESS DENIED ]</div>
             <div class="status-icon">⚠️</div>
             <h1 class="title">Verification Failed</h1>
-            <p class="subtitle">Access has been restricted by system security protocols.</p>
+            <p class="subtitle">Access restricted by security protocols.</p>
             <div class="reason-box">
                 <div class="reason-title">SYSTEM DIAGNOSTIC:</div>
                 <div class="reason-text">${reasonText}</div>
             </div>
-            <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">
-                🔄 GET NEW LINK
-            </a>
+            <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">🔄 GET NEW LINK</a>
         </div>
+        <script>
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+            }
+        </script>
     </body>
     </html>
     `;
 }
 
+// ----------------------------------------------------------------------
+// 1️⃣ STEP 1: INITIAL VERIFICATION PAGE
+// ----------------------------------------------------------------------
 app.get('/verify', async (req, res) => {
     const { token } = req.query;
 
@@ -198,10 +190,7 @@ app.get('/verify', async (req, res) => {
                     border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
                     border-radius: 50%; animation: spin 1s linear infinite;
                 }
-                .timer-count {
-                    font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2;
-                    text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
-                }
+                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
                 .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 .status { margin-top: 12px; color: #00f3ff; font-size: 13px; min-height: 18px; }
@@ -285,15 +274,11 @@ app.get('/verify', async (req, res) => {
                 let destinationUrl = "";
 
                 async function processVerify() {
-                    if (!turnstileResponseToken) {
-                        alert("Please complete the Captcha check!");
-                        return;
-                    }
+                    if (!turnstileResponseToken) return alert("Please complete Captcha!");
 
                     const btn = document.getElementById('vBtn');
                     const status = document.getElementById('status');
-                    btn.disabled = true;
-                    btn.innerText = "INITIALIZING...";
+                    btn.disabled = true; btn.innerText = "INITIALIZING...";
                     status.innerText = "Validating security check...";
 
                     try {
@@ -306,16 +291,12 @@ app.get('/verify', async (req, res) => {
                         } else {
                             alert(data.message || "Verification Failed!");
                             if (window.turnstile) window.turnstile.reset();
-                            btn.disabled = true;
-                            btn.innerText = "VERIFY NOW";
-                            status.innerText = "Verification failed. Please retry captcha.";
+                            btn.disabled = true; btn.innerText = "VERIFY NOW";
                         }
                     } catch(e) {
-                        alert("Network Error! Please try again.");
+                        alert("Network Error!");
                         if (window.turnstile) window.turnstile.reset();
-                        btn.disabled = true;
-                        btn.innerText = "VERIFY NOW";
-                        status.innerText = "Network error. Please try again.";
+                        btn.disabled = true; btn.innerText = "VERIFY NOW";
                     }
                 }
 
@@ -329,9 +310,7 @@ app.get('/verify', async (req, res) => {
 
                     const timer = setInterval(() => {
                         seconds--;
-                        if (seconds >= 0) {
-                            timerCount.innerText = seconds;
-                        }
+                        if (seconds >= 0) timerCount.innerText = seconds;
 
                         if (seconds < 0) {
                             clearInterval(timer);
@@ -364,6 +343,9 @@ app.get('/verify', async (req, res) => {
     }
 });
 
+// ----------------------------------------------------------------------
+// 2️⃣ STEP 2: GENERATE SHORTLINK & SAVE TIME
+// ----------------------------------------------------------------------
 app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
 
@@ -383,29 +365,23 @@ app.get('/api/process-token', async (req, res) => {
 
         const cleanToken = token.trim();
 
-        // Check if token exists
-        const tokenDoc = await db.collection('verify_tokens').findOne({ 
-            token: cleanToken, 
-            is_used: false 
-        });
-
+        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken, is_used: false });
         if (!tokenDoc) {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // Record generation time in Database for 40-sec Lock
+        // Record creation timestamp for 40-sec check
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
             { $set: { generated_at: Date.now() } }
         );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
-
         if (!settings || !settings.shortlink_url || !settings.shortlink_api) {
-            return res.json({ success: false, message: "Shortener configuration missing in Database." });
+            return res.json({ success: false, message: "Shortener configuration missing." });
         }
 
-        // Target URL is now PROXY CLAIM ENDPOINT (Not directly Telegram Bot)
+        // Target URL points to GATEKEEPER ENDPOINT (/claim)
         const hostUrl = req.protocol + '://' + req.get('host');
         const targetProxyUrl = `${hostUrl}/claim?token=${cleanToken}`;
 
@@ -426,7 +402,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 🛡️ GATEKEEPER ENDPOINT (/claim - Minimum 40 Seconds Time Check)
+// 3️⃣ STEP 3: GATEKEEPER MINI APP PAGE (/claim)
 // ----------------------------------------------------------------------
 app.get('/claim', async (req, res) => {
     const { token } = req.query;
@@ -444,39 +420,238 @@ app.get('/claim', async (req, res) => {
         }
 
         if (tokenDoc.is_used) {
-            return res.status(403).send(renderAccessDeniedUI("⚠️ This link has already been claimed."));
+            return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
+        }
+
+        // Render Mini App UI for Claiming
+        res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Security Verification Gateway</title>
+            
+            <script src="https://telegram.org/js/telegram-web-app.js"></script>
+            
+            <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body {
+                    background: #0b0f19; color: white;
+                    font-family: 'Segoe UI', -apple-system, sans-serif;
+                    display: flex; justify-content: center; align-items: center;
+                    min-height: 100vh; overflow: hidden; position: relative;
+                }
+                #fogCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+                .card {
+                    position: relative; z-index: 2;
+                    background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                    border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
+                    padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
+                    box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+                }
+                h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; color: #fff; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
+                .btn {
+                    background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
+                    color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
+                    border-radius: 8px; cursor: pointer; width: 100%; transition: 0.3s ease;
+                    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+                }
+                .btn:hover { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6); transform: translateY(-1px); }
+                .hidden { display: none; }
+
+                .spinner-wrapper {
+                    position: relative; width: 65px; height: 65px;
+                    margin: 0 auto 20px; display: flex;
+                    align-items: center; justify-content: center;
+                }
+                .spinner {
+                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                    border: 4px solid #1e293b; border-top: 4px solid #00f3ff;
+                    border-radius: 50%; animation: spin 1s linear infinite;
+                }
+                .timer-count { font-size: 22px; font-weight: 800; color: #00f3ff; z-index: 2; }
+                .checkmark { display: none; font-size: 48px; color: #10b981; margin-bottom: 15px; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                
+                .denied-box {
+                    background: rgba(255, 0, 85, 0.1); border: 1px solid #ff0055;
+                    border-radius: 8px; padding: 15px; margin-bottom: 15px; color: #ff0055;
+                    font-size: 13px; font-weight: bold;
+                }
+            </style>
+        </head>
+        <body>
+            <canvas id="fogCanvas"></canvas>
+
+            <div class="card">
+                <!-- STEP 1: 5 SECONDS SECURITY CHECKING -->
+                <div id="checkStep">
+                    <div class="spinner-wrapper">
+                        <div class="spinner"></div>
+                        <span id="scanCount" class="timer-count">5</span>
+                    </div>
+                    <h2>VERIFYING SECURITY...</h2>
+                    <p class="sub">PLEASE WAIT WHILE WE SCAN HUMAN INTERACTION TIME...</p>
+                </div>
+
+                <!-- STEP 2A: SUCCESS CLAIM BUTTON -->
+                <div id="claimStep" class="hidden">
+                    <div class="checkmark" style="display:block;">✓</div>
+                    <h2>VERIFICATION COMPLETE</h2>
+                    <p class="sub">CLICK BELOW TO CLAIM YOUR TOKEN AND RETURN TO BOT</p>
+                    <button id="claimBtn" class="btn" onclick="executeClaim()">🎁 CLAIM YOUR TOKEN</button>
+                </div>
+
+                <!-- STEP 2B: BYPASS DETECTED DENIED -->
+                <div id="deniedStep" class="hidden">
+                    <div class="denied-box">[ BYPASS BOT DETECTED ]</div>
+                    <h2>ACCESS RESTRICTED</h2>
+                    <p id="deniedReason" class="sub" style="color:#ef4444;"></p>
+                    <a href="https://t.me/SmartfilestorebyAcbot" class="btn" style="text-decoration:none; display:block;">🔄 GET NEW LINK</a>
+                </div>
+            </div>
+
+            <script>
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+
+                // Fog Particle Animation
+                const canvas = document.getElementById('fogCanvas');
+                const ctx = canvas.getContext('2d');
+                function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                const particles = Array.from({ length: 60 }, () => ({
+                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+                    radius: Math.random() * 2.5 + 0.5, speedY: Math.random() * 0.8 + 0.2,
+                    speedX: Math.random() * 0.4 - 0.2, opacity: Math.random() * 0.6 + 0.2
+                }));
+
+                function animateParticles() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    particles.forEach(p => {
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = \`rgba(0, 243, 255, \${p.opacity})\`; ctx.fill();
+                        p.y += p.speedY; p.x += p.speedX;
+                        if (p.y > canvas.height) p.y = 0; if (p.x > canvas.width) p.x = 0; if (p.x < 0) p.x = canvas.width;
+                    });
+                    requestAnimationFrame(animateParticles);
+                }
+                animateParticles();
+
+                // 5-Seconds Scan Logic
+                let scanSeconds = 5;
+                const scanCount = document.getElementById('scanCount');
+                
+                const scanTimer = setInterval(() => {
+                    scanSeconds--;
+                    if (scanSeconds >= 0) scanCount.innerText = scanSeconds;
+
+                    if (scanSeconds < 0) {
+                        clearInterval(scanTimer);
+                        verify40SecGate();
+                    }
+                }, 1000);
+
+                let finalBotUrl = "";
+
+                async function verify40SecGate() {
+                    try {
+                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}\`);
+                        const data = await res.json();
+
+                        document.getElementById('checkStep').classList.add('hidden');
+
+                        if (data.success && data.url) {
+                            finalBotUrl = data.url;
+                            document.getElementById('claimStep').classList.remove('hidden');
+                        } else {
+                            document.getElementById('deniedReason').innerText = data.message || "Bypass bot detected or link expired.";
+                            document.getElementById('deniedStep').classList.remove('hidden');
+                        }
+                    } catch(e) {
+                        document.getElementById('checkStep').classList.add('hidden');
+                        document.getElementById('deniedReason').innerText = "Network verification error.";
+                        document.getElementById('deniedStep').classList.remove('hidden');
+                    }
+                }
+
+                function executeClaim() {
+                    if (finalBotUrl) {
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                            window.Telegram.WebApp.openLink(finalBotUrl);
+                            window.Telegram.WebApp.close();
+                        } else {
+                            window.location.href = finalBotUrl;
+                        }
+                    }
+                }
+            </script>
+        </body>
+        </html>
+        `);
+
+    } catch (err) {
+        console.error("Claim Route Error:", err);
+        return res.status(500).send(renderAccessDeniedUI("Internal Security Check Error."));
+    }
+});
+
+// ----------------------------------------------------------------------
+// 4️⃣ STEP 4: BACKEND GATE CHECK API (/api/execute-claim)
+// ----------------------------------------------------------------------
+app.get('/api/execute-claim', async (req, res) => {
+    const { token } = req.query;
+
+    if (!token) return res.json({ success: false, message: "Token parameter missing." });
+
+    try {
+        const cleanToken = token.trim();
+        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
+
+        if (!tokenDoc) {
+            return res.json({ success: false, message: "Invalid or expired token." });
+        }
+
+        if (tokenDoc.is_used) {
+            return res.json({ success: false, message: "Token has already been claimed." });
         }
 
         const generatedAt = tokenDoc.generated_at || Date.now();
         const timeElapsedSeconds = Math.floor((Date.now() - generatedAt) / 1000);
 
-        // ⏱️ MINIMUM TIME LOCK CHECK (40 Seconds)
-        if (timeElapsedSeconds < 40) {
-            return res.status(403).send(renderAccessDeniedUI(
-                `⚠️ <b>BYPASS BOT DETECTED!</b><br>` +
-                `You completed the verification in <b>${timeElapsedSeconds}s</b>.<br>` +
-                `Minimum required human interaction time is <b>40 seconds</b>.`
-            ));
+        // ⏱️ MINIMUM 40 SECONDS SECURITY CHECK
+        if (timeElapsedSeconds < 60) {
+            return res.json({ 
+                success: false, 
+                message: `BYPASS DETECTED! You completed verification in ${timeElapsedSeconds}s. Minimum required time is 40 seconds.` 
+            });
         }
 
-        // Mark token as used after successful gate check
+        // Mark token as used
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
             { $set: { is_used: true } }
         );
 
-        // Get Bot Username
+        // Fetch Bot Username
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
         let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
         const botUsername = rawBotUsername.replace(/^@/, '');
 
-        // Redirect user to Telegram Bot
-        const finalTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
-        return res.redirect(finalTelegramUrl);
+        const targetTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
+
+        return res.json({ success: true, url: targetTelegramUrl });
 
     } catch (err) {
-        console.error("Claim Route Error:", err);
-        return res.status(500).send(renderAccessDeniedUI("Internal Security Check Error."));
+        console.error("Execute Claim Error:", err);
+        return res.json({ success: false, message: "Server execution error." });
     }
 });
 
