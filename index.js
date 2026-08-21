@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI; 
 
-// Explicitly set Telegram Bot's DB Name
+// Database Name
 const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 
 let db;
@@ -17,7 +17,7 @@ async function connectDB() {
         try {
             const client = new MongoClient(MONGO_URI);
             await client.connect();
-            db = client.db(DB_NAME); // Connected to 'Cluovvoo' database
+            db = client.db(DB_NAME);
             console.log(`✅ Connected successfully to DB: ${db.databaseName}`);
         } catch (err) {
             console.error("❌ MongoDB Connection Error:", err);
@@ -26,7 +26,7 @@ async function connectDB() {
     return db;
 }
 
-// Middleware to ensure DB is connected before handling any route
+// Connection Middleware
 app.use(async (req, res, next) => {
     await connectDB();
     if (!db) {
@@ -134,26 +134,29 @@ app.get('/api/process-token', async (req, res) => {
     try {
         const cleanToken = token.trim();
 
-        // Atomically find & delete token (Handles both Driver v5 & v6)
+        // Atomically find & delete token
         const result = await db.collection('verify_tokens').findOneAndDelete({ 
             token: cleanToken, 
             is_used: false 
         });
 
-        const tokenDoc = result.value || result; // Driver v6 fix
+        const tokenDoc = result.value || result;
 
         if (!tokenDoc || !tokenDoc.token) {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // Fetch Dynamic Settings
-        const settings = await db.collection('bot_settings').findOne({ _id: "main_settings" });
+        // Fetch settings from 'settings' collection and '_id: bot_settings'
+        const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
 
         if (!settings || !settings.shortlink_url || !settings.shortlink_api) {
             return res.json({ success: false, message: "Shortener configuration missing in Database." });
         }
 
-        const botUsername = settings.bot_username;
+        // Handles bot username automatically (strips '@' if present)
+        let rawBotUsername = settings.bot_username || "SmartfilestorebyAcbot";
+        const botUsername = rawBotUsername.replace(/^@/, '');
+
         const targetTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
         
         const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetTelegramUrl)}`;
