@@ -73,22 +73,143 @@ app.get('/verify', async (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Secure Verification</title>
             <style>
-                body { background: #0b0f19; color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 16px; padding: 30px; text-align: center; width: 85%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-                .btn { background: #00d2ff; color: #000; border: none; padding: 14px 28px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 20px; transition: 0.2s; }
-                .btn:disabled { background: #334155; color: #94a3b8; }
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body {
+                    background: #0b0f19;
+                    color: white;
+                    font-family: 'Segoe UI', -apple-system, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    overflow: hidden;
+                    position: relative;
+                }
+                
+                /* 🌫️ Canvas for Fog Particles */
+                #fogCanvas {
+                    position: absolute;
+                    top: 0; left: 0;
+                    width: 100%; height: 100%;
+                    z-index: 1;
+                    pointer-events: none;
+                }
+
+                .card {
+                    position: relative;
+                    z-index: 2;
+                    background: rgba(19, 27, 46, 0.85);
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 16px;
+                    padding: 32px 24px;
+                    text-align: center;
+                    width: 88%;
+                    max-width: 380px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+                }
+
+                h2 { font-size: 20px; letter-spacing: 1px; margin-bottom: 8px; }
+                p.sub { color: #94a3b8; font-size: 13px; margin-bottom: 24px; text-transform: uppercase; }
+
+                .btn {
+                    background: #00d2ff;
+                    color: #000;
+                    border: none;
+                    padding: 14px 28px;
+                    font-size: 15px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    width: 100%;
+                    transition: 0.3s ease;
+                }
+                .btn:hover { background: #00b8e6; }
+                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+
+                .hidden { display: none; }
+                
+                .spinner {
+                    width: 48px;
+                    height: 48px;
+                    border: 4px solid #1e293b;
+                    border-top: 4px solid #00d2ff;
+                    border-radius: 50%;
+                    margin: 0 auto 20px;
+                    animation: spin 1s linear infinite;
+                }
+                .checkmark {
+                    display: none;
+                    font-size: 48px;
+                    color: #10b981;
+                    margin-bottom: 15px;
+                }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
                 .status { margin-top: 15px; color: #38bdf8; font-size: 13px; }
+                .timer-text { font-size: 12px; color: #64748b; margin-top: 15px; }
             </style>
         </head>
         <body>
+            <canvas id="fogCanvas"></canvas>
+
             <div class="card">
-                <h2 style="letter-spacing:1px; margin-bottom:5px;">SECURE VERIFICATION</h2>
-                <p style="color:#94a3b8; font-size:13px;">PLEASE COMPLETE THIS INITIAL CHECK TO PROCEED.</p>
-                <button id="vBtn" class="btn" onclick="processVerify()">VERIFY NOW</button>
-                <div id="status" class="status"></div>
+                <!-- STEP 1: INITIAL UI -->
+                <div id="step1">
+                    <h2>SECURE VERIFICATION</h2>
+                    <p class="sub">PLEASE COMPLETE THIS INITIAL CHECK TO PROCEED. 🎴</p>
+                    <button id="vBtn" class="btn" onclick="processVerify()">VERIFY NOW</button>
+                    <div id="status" class="status"></div>
+                </div>
+
+                <!-- STEP 2: COUNTDOWN REDIRECT UI -->
+                <div id="step2" class="hidden">
+                    <div id="loadingSpinner" class="spinner"></div>
+                    <div id="checkIcon" class="checkmark">✓</div>
+                    <h2>REDIRECTING...</h2>
+                    <p id="statusMsg" class="sub">WE ARE TAKING YOU TO THE VERIFICATION PAGE. PLEASE WAIT...</p>
+                    <button id="redirectBtn" class="btn hidden" onclick="goShortlink()">CLICK IF NOT REDIRECTED</button>
+                    <p class="timer-text">DO NOT CLOSE THIS WINDOW.</p>
+                </div>
             </div>
 
             <script>
+                // 1. Fog Particles Animation Engine
+                const canvas = document.getElementById('fogCanvas');
+                const ctx = canvas.getContext('2d');
+                function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                const particles = Array.from({ length: 60 }, () => ({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2.5 + 0.5,
+                    speedY: Math.random() * 0.8 + 0.2,
+                    speedX: Math.random() * 0.4 - 0.2,
+                    opacity: Math.random() * 0.6 + 0.2
+                }));
+
+                function animateParticles() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    particles.forEach(p => {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = \`rgba(255, 255, 255, \${p.opacity})\`;
+                        ctx.fill();
+                        p.y += p.speedY; p.x += p.speedX;
+                        if (p.y > canvas.height) p.y = 0;
+                        if (p.x > canvas.width) p.x = 0;
+                        if (p.x < 0) p.x = canvas.width;
+                    });
+                    requestAnimationFrame(animateParticles);
+                }
+                animateParticles();
+
+                // 2. Token & Redirection Processing
+                let destinationUrl = "";
+
                 async function processVerify() {
                     const btn = document.getElementById('vBtn');
                     const status = document.getElementById('status');
@@ -101,8 +222,8 @@ app.get('/verify', async (req, res) => {
                         const data = await res.json();
                         
                         if(data.success && data.url) {
-                            status.innerText = "Redirecting to Shortener...";
-                            window.location.href = data.url;
+                            destinationUrl = data.url;
+                            startCountdown();
                         } else {
                             alert(data.message || "Verification Failed!");
                             btn.disabled = false;
@@ -113,6 +234,35 @@ app.get('/verify', async (req, res) => {
                         alert("Network Error! Please try again.");
                         btn.disabled = false;
                         btn.innerText = "VERIFY NOW";
+                        status.innerText = "";
+                    }
+                }
+
+                function startCountdown() {
+                    document.getElementById('step1').classList.add('hidden');
+                    document.getElementById('step2').classList.remove('hidden');
+
+                    let seconds = 5;
+                    const statusMsg = document.getElementById('statusMsg');
+
+                    const timer = setInterval(() => {
+                        statusMsg.innerText = \`Verification link ready! Redirecting in \${seconds}s...\`;
+                        seconds--;
+
+                        if (seconds < 0) {
+                            clearInterval(timer);
+                            document.getElementById('loadingSpinner').style.display = 'none';
+                            document.getElementById('checkIcon').style.display = 'block';
+                            document.getElementById('redirectBtn').classList.remove('hidden');
+                            statusMsg.innerText = "Verification link ready!";
+                            goShortlink();
+                        }
+                    }, 1000);
+                }
+
+                function goShortlink() {
+                    if (destinationUrl) {
+                        window.location.href = destinationUrl;
                     }
                 }
             </script>
