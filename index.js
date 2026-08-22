@@ -16,7 +16,6 @@ const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2Cr
 const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "Zender_Secret_Pass_8921";
 
 // ⚙️ POSTBACK REQUIREMENT FLAG:
-// Admin ke webhook setup hone tak `false` rakha hai
 const REQUIRE_POSTBACK = false; 
 
 let db;
@@ -185,8 +184,6 @@ app.get('/verify', async (req, res) => {
                     border-radius: 8px; cursor: pointer; width: 100%;
                 }
                 .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
-                
-                /* 🚀 Loading HUD Animation Styles */
                 .loader-box { display: none; margin-top: 15px; }
                 .progress-bar {
                     width: 100%; height: 8px; background: rgba(255,255,255,0.1);
@@ -208,7 +205,6 @@ app.get('/verify', async (req, res) => {
                     <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY & CONTINUE</button>
                 </div>
 
-                <!-- 🔄 Redirecting Progress UI -->
                 <div id="loader" class="loader-box">
                     <div class="status-text" id="statusText">INITIALIZING...</div>
                     <div class="progress-bar"><div id="progress" class="fill"></div></div>
@@ -228,7 +224,6 @@ app.get('/verify', async (req, res) => {
                 }
 
                 async function processVerify() {
-                    // Turnstile UI छुपाकर Loading/Progress UI दिखाओ
                     document.getElementById('verify-form').style.display = 'none';
                     document.getElementById('loader').style.display = 'block';
 
@@ -251,7 +246,6 @@ app.get('/verify', async (req, res) => {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
                         const data = await res.json();
                         
-                        // Smooth Animation Complete hone ka wait karke redirect karo
                         setTimeout(() => {
                             if(data.success && data.url) {
                                 if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
@@ -335,7 +329,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE
+// 3️⃣ STEP 3: UPDATED ANTI-BYPASS GATE (PAYLOAD VERIFIED HUD UI)
 // ----------------------------------------------------------------------
 app.get('/gate', async (req, res) => {
     const { token } = req.query;
@@ -360,8 +354,9 @@ app.get('/gate', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Anti-Bypass Inspection</title>
+            <title>Secure Link Gate</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
@@ -374,19 +369,31 @@ app.get('/gate', async (req, res) => {
                     background: rgba(13, 17, 23, 0.9);
                     border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
                     padding: 30px 24px; text-align: center; width: 90%; max-width: 380px;
+                    box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
                 }
-                h2 { font-size: 18px; color: #00f3ff; margin-bottom: 6px; }
-                .progress-bar {
-                    width: 100%; height: 8px; background: rgba(255,255,255,0.1);
-                    border-radius: 4px; overflow: hidden; margin-top: 15px;
+                .badge-payload {
+                    display: inline-block; background: rgba(0, 243, 255, 0.1);
+                    border: 1px solid #00f3ff; color: #00f3ff;
+                    font-size: 10px; font-weight: bold; letter-spacing: 1px;
+                    padding: 4px 12px; border-radius: 20px; margin-bottom: 15px;
                 }
-                .fill { width: 0%; height: 100%; background: #00f3ff; transition: width 0.1s linear; }
+                h2 { font-size: 20px; color: #fff; margin-bottom: 4px; font-weight: 700; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 15px; }
+                .timer-box { font-size: 36px; font-weight: bold; color: #00f3ff; margin: 15px 0; }
+                .cf-box { display: flex; justify-content: center; margin-top: 10px; }
             </style>
         </head>
         <body>
             <div class="card">
-                <h2>🔍 INSPECTING TRAFFIC...</h2>
-                <div class="progress-bar"><div id="progress" class="fill"></div></div>
+                <div class="badge-payload">● PAYLOAD VERIFIED</div>
+                <h2>Secure Link</h2>
+                <p class="sub">Verifying your browser...</p>
+                
+                <div class="timer-box" id="timer">3</div>
+
+                <div class="cf-box">
+                    <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onGateVerified"></div>
+                </div>
             </div>
 
             <script>
@@ -395,27 +402,38 @@ app.get('/gate', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
-                let percent = 0;
-                const interval = setInterval(() => {
-                    percent += 10;
-                    document.getElementById('progress').style.width = percent + '%';
-                    if (percent >= 100) {
-                        clearInterval(interval);
-                        passGate();
-                    }
-                }, 150);
+                let count = 3;
+                let captchaToken = null;
 
-                async function passGate() {
-                    try {
-                        const res = await fetch(\`/api/pass-gate?token=${cleanToken}\`);
-                        const data = await res.json();
-                        if (data.success) {
-                            window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
-                        } else {
-                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Check Failed")}\`;
+                const countdown = setInterval(() => {
+                    count--;
+                    if(count > 0) {
+                        document.getElementById('timer').innerText = count;
+                    } else {
+                        clearInterval(countdown);
+                        document.getElementById('timer').innerText = "✓";
+                        checkAndRedirect();
+                    }
+                }, 1000);
+
+                function onGateVerified(token) {
+                    captchaToken = token;
+                    checkAndRedirect();
+                }
+
+                async function checkAndRedirect() {
+                    if (count <= 0 && captchaToken) {
+                        try {
+                            const res = await fetch(\`/api/pass-gate?token=${cleanToken}&cf_token=\${encodeURIComponent(captchaToken)}\`);
+                            const data = await res.json();
+                            if (data.success) {
+                                window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
+                            } else {
+                                window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Check Failed")}\`;
+                            }
+                        } catch(e) {
+                            window.location.href = "/access-denied?reason=Gate Connection Error";
                         }
-                    } catch(e) {
-                        window.location.href = "/access-denied?reason=Gate Connection Error";
                     }
                 }
             </script>
@@ -428,12 +446,22 @@ app.get('/gate', async (req, res) => {
     }
 });
 
-// Secure Pass Gate API
+// Secure Pass Gate API (with Turnstile validation)
 app.get('/api/pass-gate', async (req, res) => {
-    const { token } = req.query;
-    if (!token) return res.json({ success: false, message: "Missing token." });
+    const { token, cf_token } = req.query;
+    if (!token || !cf_token) return res.json({ success: false, message: "Missing token or captcha parameters." });
 
     try {
+        const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+        const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
+            secret: TURNSTILE_SECRET_KEY,
+            response: cf_token
+        }));
+
+        if (!cfResponse.data.success) {
+            return res.json({ success: false, message: "Gate Captcha verification failed!" });
+        }
+
         const cleanToken = token.trim();
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
@@ -576,7 +604,6 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        // 🚨 1. POSTBACK CHECK (Only active if REQUIRE_POSTBACK === true)
         if (REQUIRE_POSTBACK && !tokenDoc.is_completed) {
             return res.json({ 
                 success: false, 
@@ -584,13 +611,11 @@ app.get('/api/execute-claim', async (req, res) => {
             });
         }
 
-        // 🛡️ 2. HMAC Gate Hash Validation
         const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
         if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
             return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
         }
 
-        // 🛡️ 3. Cloudflare Turnstile Captcha Check
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
             secret: TURNSTILE_SECRET_KEY,
@@ -601,7 +626,6 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Security Captcha verification failed!" });
         }
 
-        // Mark token as used
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
             { $set: { is_used: true, claimed_at: Date.now() } }
