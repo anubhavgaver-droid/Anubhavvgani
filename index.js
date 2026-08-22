@@ -293,7 +293,7 @@ app.get('/api/pass-gate', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: SILENT CLAIM & REDIRECT TO TELEGRAM
+// 3️⃣ STEP 3: SILENT CLAIM & REDIRECT TO TELEGRAM (FIXED FOR IN-APP WEBVIEW)
 // ----------------------------------------------------------------------
 app.get('/claim', async (req, res) => {
     const { token, hash } = req.query;
@@ -317,6 +317,7 @@ app.get('/claim', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Claiming...</title>
+            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 body { background: #07090e; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
@@ -333,7 +334,12 @@ app.get('/claim', async (req, res) => {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(cfToken)}\`);
                         const data = await res.json();
                         if (data.success && data.url) {
-                            window.location.href = data.url;
+                            // Fix for ERR_UNKNOWN_URL_SCHEME in Telegram In-App Browser
+                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
+                                window.Telegram.WebApp.openTelegramLink(data.web_url || data.url);
+                            } else {
+                                window.location.href = data.url;
+                            }
                         } else {
                             window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Claim Failed")}\`;
                         }
@@ -350,7 +356,7 @@ app.get('/claim', async (req, res) => {
     }
 });
 
-// FINAL BACKEND CLAIM EXECUTION
+// FINAL BACKEND CLAIM EXECUTION (UPDATED REDIRECT URLS)
 app.get('/api/execute-claim', async (req, res) => {
     const { token, hash, cf_token } = req.query;
     if (!token || !hash || !cf_token) return res.json({ success: false, message: "Missing params." });
@@ -391,8 +397,15 @@ app.get('/api/execute-claim', async (req, res) => {
         let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
         const botUsername = rawBotUsername.replace(/^@/, '');
 
-        const targetTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
-        return res.json({ success: true, url: targetTelegramUrl });
+        // Standard Telegram Deep-Link Protocol
+        const targetTelegramUrl = `tg://resolve?domain=${botUsername}&start=verify_${cleanToken}`;
+        const webTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
+
+        return res.json({ 
+            success: true, 
+            url: targetTelegramUrl,
+            web_url: webTelegramUrl
+        });
 
     } catch (err) {
         return res.json({ success: false, message: "Server execution error." });
