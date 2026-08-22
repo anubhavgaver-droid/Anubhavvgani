@@ -329,7 +329,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: UPDATED ANTI-BYPASS GATE (PAYLOAD VERIFIED HUD UI)
+// 3️⃣ STEP 3: ADVANCED DYNAMIC GATE (MATCHING VIDEO ANIMATION)
 // ----------------------------------------------------------------------
 app.get('/gate', async (req, res) => {
     const { token } = req.query;
@@ -354,45 +354,110 @@ app.get('/gate', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Secure Link Gate</title>
+            <title>Verification Gateway</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
-                    background: #07090e; color: white;
-                    font-family: 'Segoe UI', -apple-system, sans-serif;
+                    background: #000; color: #fff;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     display: flex; justify-content: center; align-items: center;
                     min-height: 100vh; overflow: hidden;
                 }
                 .card {
-                    background: rgba(13, 17, 23, 0.9);
-                    border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
-                    padding: 30px 24px; text-align: center; width: 90%; max-width: 380px;
-                    box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+                    background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 20px; padding: 24px 20px; text-align: center;
+                    width: 90%; max-width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+                }
+                .icon-shield {
+                    width: 36px; height: 36px; border-radius: 10px;
+                    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.1);
+                    display: flex; align-items: center; justify-content: center;
+                    margin: 0 auto 16px auto; font-size: 16px;
+                }
+                .badge-blue {
+                    display: inline-block; background: rgba(0, 119, 255, 0.15);
+                    border: 1px solid #0077ff; color: #3898ff;
+                    font-size: 9px; font-weight: 800; letter-spacing: 1px;
+                    padding: 4px 10px; border-radius: 12px; margin-bottom: 12px;
                 }
                 .badge-payload {
-                    display: inline-block; background: rgba(0, 243, 255, 0.1);
-                    border: 1px solid #00f3ff; color: #00f3ff;
-                    font-size: 10px; font-weight: bold; letter-spacing: 1px;
-                    padding: 4px 12px; border-radius: 20px; margin-bottom: 15px;
+                    display: inline-block; background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2); color: #ccc;
+                    font-size: 9px; font-weight: 800; letter-spacing: 1px;
+                    padding: 4px 10px; border-radius: 12px; margin-bottom: 12px;
                 }
-                h2 { font-size: 20px; color: #fff; margin-bottom: 4px; font-weight: 700; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 15px; }
-                .timer-box { font-size: 36px; font-weight: bold; color: #00f3ff; margin: 15px 0; }
+                h2 { font-size: 18px; color: #fff; margin-bottom: 6px; font-weight: 600; }
+                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 20px; }
+                .btn-verify {
+                    background: #ffffff; color: #000; border: none;
+                    padding: 14px 20px; font-size: 14px; font-weight: 600;
+                    border-radius: 12px; cursor: pointer; width: 100%; transition: 0.2s;
+                }
+                .btn-verify:hover { background: #e6e6e6; }
+                .dest-box {
+                    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+                    border-radius: 12px; padding: 12px; margin-bottom: 15px; display: flex;
+                    align-items: center; justify-content: space-between;
+                }
+                .timer-num { font-size: 22px; font-weight: bold; color: #fff; }
+                .dest-url { font-size: 13px; color: #e6edf3; font-weight: 500; }
                 .cf-box { display: flex; justify-content: center; margin-top: 10px; }
+                .modal-overlay {
+                    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px);
+                    justify-content: center; align-items: center; z-index: 10;
+                }
+                .modal-card {
+                    background: #161b22; border: 1px solid rgba(255,255,255,0.15);
+                    border-radius: 16px; padding: 25px; text-align: center; width: 80%; max-width: 300px;
+                }
+                .check-circle {
+                    width: 40px; height: 40px; border-radius: 50%;
+                    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+                    display: flex; align-items: center; justify-content: center;
+                    margin: 0 auto 12px auto; font-size: 18px; color: #fff;
+                }
             </style>
         </head>
         <body>
-            <div class="card">
+
+            <!-- PHASE 1: ACTION REQUIRED PAGE -->
+            <div class="card" id="phase1">
+                <div class="icon-shield">🛡️</div>
+                <div class="badge-blue">● ACTION REQUIRED</div>
+                <h2>Verify Connection</h2>
+                <p class="sub">Please click below to securely verify your access token.</p>
+                <button class="btn-verify" onclick="startVerification()">Verify Now</button>
+            </div>
+
+            <!-- PHASE 2: PAYLOAD & TURNSTILE CHECK PAGE -->
+            <div class="card" id="phase2" style="display: none;">
+                <div class="icon-shield">🛡️</div>
                 <div class="badge-payload">● PAYLOAD VERIFIED</div>
-                <h2>Secure Link</h2>
-                <p class="sub">Verifying your browser...</p>
-                
-                <div class="timer-box" id="timer">3</div>
+                <h2>Access Granted</h2>
+                <p class="sub">Your request has been verified and is being routed securely.</p>
+
+                <div class="dest-box">
+                    <span class="timer-num" id="timer">3</span>
+                    <div>
+                        <div style="font-size:10px; color:#8b949e; text-align:right;">Destination</div>
+                        <div class="dest-url">get2short.com</div>
+                    </div>
+                </div>
 
                 <div class="cf-box">
                     <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onGateVerified"></div>
+                </div>
+            </div>
+
+            <!-- PHASE 3: VERIFICATION COMPLETE MODAL -->
+            <div class="modal-overlay" id="phase3">
+                <div class="modal-card">
+                    <div class="check-circle">✓</div>
+                    <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">Verification Complete</h3>
+                    <p style="font-size: 11px; color: #8b949e;">Routing to destination...</p>
                 </div>
             </div>
 
@@ -404,17 +469,23 @@ app.get('/gate', async (req, res) => {
 
                 let count = 3;
                 let captchaToken = null;
+                let countdownInterval = null;
 
-                const countdown = setInterval(() => {
-                    count--;
-                    if(count > 0) {
-                        document.getElementById('timer').innerText = count;
-                    } else {
-                        clearInterval(countdown);
-                        document.getElementById('timer').innerText = "✓";
-                        checkAndRedirect();
-                    }
-                }, 1000);
+                function startVerification() {
+                    document.getElementById('phase1').style.display = 'none';
+                    document.getElementById('phase2').style.display = 'block';
+
+                    countdownInterval = setInterval(() => {
+                        count--;
+                        if(count > 0) {
+                            document.getElementById('timer').innerText = count;
+                        } else {
+                            clearInterval(countdownInterval);
+                            document.getElementById('timer').innerText = "✓";
+                            checkAndRedirect();
+                        }
+                    }, 1000);
+                }
 
                 function onGateVerified(token) {
                     captchaToken = token;
@@ -427,7 +498,10 @@ app.get('/gate', async (req, res) => {
                             const res = await fetch(\`/api/pass-gate?token=${cleanToken}&cf_token=\${encodeURIComponent(captchaToken)}\`);
                             const data = await res.json();
                             if (data.success) {
-                                window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
+                                document.getElementById('phase3').style.display = 'flex';
+                                setTimeout(() => {
+                                    window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
+                                }, 1200);
                             } else {
                                 window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Check Failed")}\`;
                             }
@@ -446,7 +520,7 @@ app.get('/gate', async (req, res) => {
     }
 });
 
-// Secure Pass Gate API (with Turnstile validation)
+// Secure Pass Gate API
 app.get('/api/pass-gate', async (req, res) => {
     const { token, cf_token } = req.query;
     if (!token || !cf_token) return res.json({ success: false, message: "Missing token or captcha parameters." });
