@@ -179,7 +179,7 @@ app.get('/verify', async (req, res) => {
                 .progress-ring { transform: rotate(-90deg); }
                 .progress-ring__circle {
                     stroke-dasharray: 314.159; stroke-dashoffset: 0;
-                    transition: stroke-dashoffset 1s linear; stroke-linecap: round;
+                    transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
                 }
                 .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
                 .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
@@ -202,10 +202,10 @@ app.get('/verify', async (req, res) => {
                         <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                         <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                     </svg>
-                    <div id="countdown" class="number">3</div>
+                    <div id="countdown" class="number">5</div>
                 </div>
 
-                <h1 class="brand-title">HARI MOVIEZ</h1>
+                <h1 class="brand-title">Ac Premium</h1>
                 <h2 class="section-title">Security Check</h2>
                 <p id="statusText" class="status-text">Verifying human...</p>
 
@@ -231,7 +231,9 @@ app.get('/verify', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                let timeLeft = 3;
+                const totalDuration = 5000; // 5 Seconds
+                let timeRemaining = totalDuration;
+
                 function setProgress(percent) {
                     const offset = circumference - (percent / 100) * circumference;
                     circle.style.strokeDashoffset = offset;
@@ -239,16 +241,20 @@ app.get('/verify', async (req, res) => {
                 setProgress(100);
 
                 const timer = setInterval(() => {
-                    timeLeft--;
-                    if (timeLeft >= 0) {
-                        countdownEl.textContent = timeLeft;
-                        setProgress((timeLeft / 3) * 100);
-                        if (timeLeft === 1) statusTextEl.textContent = "Checking connection...";
+                    timeRemaining -= 100;
+                    const displaySeconds = Math.ceil(timeRemaining / 1000);
+                    
+                    if (timeRemaining >= 0) {
+                        countdownEl.textContent = displaySeconds;
+                        setProgress((timeRemaining / totalDuration) * 100);
+                        if (displaySeconds === 1) statusTextEl.textContent = "Checking connection...";
                     } else {
                         clearInterval(timer);
+                        countdownEl.textContent = "0";
+                        setProgress(0);
                         statusTextEl.textContent = "Complete Security Check";
                     }
-                }, 1000);
+                }, 100);
 
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
@@ -392,7 +398,7 @@ app.get('/gate', async (req, res) => {
                 .progress-ring { transform: rotate(-90deg); }
                 .progress-ring__circle {
                     stroke-dasharray: 314.159; stroke-dashoffset: 0;
-                    transition: stroke-dashoffset 1s linear; stroke-linecap: round;
+                    transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
                 }
                 .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
                 .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
@@ -412,15 +418,15 @@ app.get('/gate', async (req, res) => {
                         <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                         <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                     </svg>
-                    <div id="countdown" class="number">3</div>
+                    <div id="countdown" class="number">5</div>
                 </div>
 
-                <h1 class="brand-title">HARI MOVIEZ</h1>
+                <h1 class="brand-title">Ac Premium</h1>
                 <h2 class="section-title">Security Verification</h2>
                 <p id="status-text" class="status-text">Verifying human...</p>
 
                 <div class="badge">
-                    <span>⚡</span> Hari Moviez
+                    <span>⚡</span> Ac Premium
                 </div>
             </div>
 
@@ -438,7 +444,9 @@ app.get('/gate', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                let timeLeft = 3;
+                const totalDuration = 5000; // 5 Seconds
+                let timeRemaining = totalDuration;
+
                 function setProgress(percent) {
                     const offset = circumference - (percent / 100) * circumference;
                     circle.style.strokeDashoffset = offset;
@@ -446,17 +454,21 @@ app.get('/gate', async (req, res) => {
                 setProgress(100);
 
                 const timer = setInterval(() => {
-                    timeLeft--;
-                    if (timeLeft >= 0) {
-                        countdownEl.textContent = timeLeft;
-                        setProgress((timeLeft / 3) * 100);
-                        if (timeLeft === 1) statusTextEl.textContent = "Checking connection...";
+                    timeRemaining -= 100;
+                    const displaySeconds = Math.ceil(timeRemaining / 1000);
+                    
+                    if (timeRemaining >= 0) {
+                        countdownEl.textContent = displaySeconds;
+                        setProgress((timeRemaining / totalDuration) * 100);
+                        if (displaySeconds === 1) statusTextEl.textContent = "Checking connection...";
                     } else {
                         clearInterval(timer);
+                        countdownEl.textContent = "0";
+                        setProgress(0);
                         statusTextEl.textContent = "Redirecting...";
                         passGate();
                     }
-                }, 1000);
+                }, 100);
 
                 async function passGate() {
                     try {
@@ -557,7 +569,7 @@ app.get('/claim', async (req, res) => {
                 .progress-ring { transform: rotate(-90deg); }
                 .progress-ring__circle {
                     stroke-dasharray: 314.159; stroke-dashoffset: 0;
-                    transition: stroke-dashoffset 1s linear; stroke-linecap: round;
+                    transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
                 }
                 .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
                 .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
@@ -580,10 +592,10 @@ app.get('/claim', async (req, res) => {
                         <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                         <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                     </svg>
-                    <div id="countdown" class="number">3</div>
+                    <div id="countdown" class="number">5</div>
                 </div>
 
-                <h1 class="brand-title">HARI MOVIEZ</h1>
+                <h1 class="brand-title">Ac Premium</h1>
                 <h2 class="section-title">Final Check</h2>
                 <p id="statusText" class="status-text">Verifying human...</p>
 
@@ -609,7 +621,9 @@ app.get('/claim', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                let timeLeft = 3;
+                const totalDuration = 5000; // 5 Seconds
+                let timeRemaining = totalDuration;
+
                 function setProgress(percent) {
                     const offset = circumference - (percent / 100) * circumference;
                     circle.style.strokeDashoffset = offset;
@@ -617,16 +631,20 @@ app.get('/claim', async (req, res) => {
                 setProgress(100);
 
                 const timer = setInterval(() => {
-                    timeLeft--;
-                    if (timeLeft >= 0) {
-                        countdownEl.textContent = timeLeft;
-                        setProgress((timeLeft / 3) * 100);
-                        if (timeLeft === 1) statusTextEl.textContent = "Checking connection...";
+                    timeRemaining -= 100;
+                    const displaySeconds = Math.ceil(timeRemaining / 1000);
+                    
+                    if (timeRemaining >= 0) {
+                        countdownEl.textContent = displaySeconds;
+                        setProgress((timeRemaining / totalDuration) * 100);
+                        if (displaySeconds === 1) statusTextEl.textContent = "Checking connection...";
                     } else {
                         clearInterval(timer);
+                        countdownEl.textContent = "0";
+                        setProgress(0);
                         statusTextEl.textContent = "Click button below";
                     }
-                }, 1000);
+                }, 100);
 
                 let claimCaptchaToken = "";
                 function onClaimCaptcha(token) {
