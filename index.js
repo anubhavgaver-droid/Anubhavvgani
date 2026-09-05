@@ -63,22 +63,21 @@ function renderAccessDeniedUI(reasonText) {
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
             :root {
-                --bg-color: #07090e; --card-bg: rgba(13, 17, 23, 0.85);
-                --cyan-glow: #00f3ff; --red-glow: #ff0055; --red-dim: rgba(255, 0, 85, 0.15);
-                --text-main: #e6edf3; --text-sub: #8b949e;
+                --bg-color: #121212; --card-bg: #1a1a1a;
+                --yellow-glow: #ffcc00; --red-glow: #ff0055; --red-dim: rgba(255, 0, 85, 0.15);
+                --text-main: #ffffff; --text-sub: #a0a0a0;
             }
-            * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+            * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
             body {
                 background-color: var(--bg-color); color: var(--text-main);
                 display: flex; justify-content: center; align-items: center;
                 min-height: 100vh; padding: 20px; overflow: hidden;
             }
             .hud-card {
-                position: relative; z-index: 1; width: 100%; max-width: 400px;
-                background: var(--card-bg); backdrop-filter: blur(16px);
-                border: 1px solid rgba(0, 243, 255, 0.25); border-radius: 16px;
-                padding: 28px 24px; text-align: center;
-                box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
+                position: relative; z-index: 1; width: 320px;
+                background: var(--card-bg); border: 1px solid #2d2d2d;
+                border-radius: 28px; padding: 35px 20px; text-align: center;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             }
             .badge-denied {
                 display: inline-block; padding: 6px 14px; border-radius: 20px;
@@ -90,15 +89,14 @@ function renderAccessDeniedUI(reasonText) {
             .title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 8px; }
             .subtitle { font-size: 13px; color: var(--text-sub); margin-bottom: 22px; line-height: 1.5; }
             .reason-box {
-                background: rgba(0, 0, 0, 0.4); border-left: 3px solid var(--cyan-glow);
+                background: rgba(0, 0, 0, 0.4); border-left: 3px solid var(--yellow-glow);
                 border-radius: 6px; padding: 14px; text-align: left; margin-bottom: 24px;
             }
-            .reason-title { font-size: 10px; text-transform: uppercase; color: var(--cyan-glow); letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
+            .reason-title { font-size: 10px; text-transform: uppercase; color: var(--yellow-glow); letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
             .reason-text { font-size: 13px; color: var(--text-main); font-weight: 500; }
             .btn-action {
-                display: block; width: 100%; padding: 12px; border-radius: 8px;
-                background: linear-gradient(135deg, rgba(0, 243, 255, 0.2) 0%, rgba(0, 243, 255, 0.05) 100%);
-                border: 1px solid var(--cyan-glow); color: var(--cyan-glow);
+                display: block; width: 100%; padding: 12px; border-radius: 20px;
+                background: #2b250d; border: 1px solid #4a3e0f; color: #ffcc00;
                 font-weight: 600; font-size: 14px; text-decoration: none; transition: 0.3s ease;
             }
         </style>
@@ -158,56 +156,64 @@ app.get('/verify', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Secure Verification</title>
+            <title>Security Verification</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+                * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
                 body {
-                    background: #0b0f19; color: white;
-                    font-family: 'Segoe UI', -apple-system, sans-serif;
-                    display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden;
+                    background-color: #121212; display: flex; justify-content: center;
+                    align-items: center; min-height: 100vh; overflow: hidden;
                 }
                 .card {
-                    background: rgba(19, 27, 46, 0.85); backdrop-filter: blur(12px);
-                    border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
-                    padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
+                    background-color: #1a1a1a; border: 1px solid #2d2d2d;
+                    border-radius: 28px; width: 320px; padding: 35px 20px;
+                    display: flex; flex-direction: column; align-items: center;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
                 }
-                h2 { font-size: 20px; margin-bottom: 8px; color: #fff; }
-                p.sub { color: #8b949e; font-size: 12px; margin-bottom: 18px; }
-                .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; }
-                .btn {
-                    background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
-                    color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
-                    border-radius: 8px; cursor: pointer; width: 100%;
+                .timer-container {
+                    position: relative; width: 120px; height: 120px;
+                    display: flex; justify-content: center; align-items: center;
+                    margin-bottom: 20px;
                 }
-                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+                .progress-ring { transform: rotate(-90deg); }
+                .progress-ring__circle {
+                    stroke-dasharray: 314.159; stroke-dashoffset: 0;
+                    transition: stroke-dashoffset 1s linear; stroke-linecap: round;
+                }
+                .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
+                .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
+                .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
+                .status-text { color: #a0a0a0; font-size: 0.85rem; margin-bottom: 20px; }
                 
-                .loader-box { display: none; margin-top: 15px; }
-                .progress-bar {
-                    width: 100%; height: 8px; background: rgba(255,255,255,0.1);
-                    border-radius: 4px; overflow: hidden; margin-top: 12px;
+                .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
+                .btn {
+                    background: #ffcc00; color: #000; border: none; padding: 12px 20px;
+                    font-size: 14px; font-weight: bold; border-radius: 20px;
+                    cursor: pointer; width: 100%; transition: 0.3s;
                 }
-                .fill { width: 0%; height: 100%; background: #00f3ff; transition: width 0.15s linear; }
-                .status-text { font-size: 12px; color: #00f3ff; font-weight: bold; letter-spacing: 1px; }
+                .btn:disabled { background: #333; color: #777; cursor: not-allowed; }
             </style>
         </head>
         <body>
             <div class="card">
-                <h2>SECURE VERIFICATION</h2>
-                <p class="sub">PLEASE COMPLETE THIS CHECK 🎴</p>
-
-                <div id="verify-form">
-                    <div class="turnstile-container">
-                        <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onCaptchaSuccess"></div>
-                    </div>
-                    <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY & CONTINUE</button>
+                <div class="timer-container">
+                    <svg class="progress-ring" width="120" height="120">
+                        <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                    </svg>
+                    <div id="countdown" class="number">3</div>
                 </div>
 
-                <div id="loader" class="loader-box">
-                    <div class="status-text" id="statusText">INITIALIZING...</div>
-                    <div class="progress-bar"><div id="progress" class="fill"></div></div>
+                <h1 class="brand-title">HARI MOVIEZ</h1>
+                <h2 class="section-title">Security Check</h2>
+                <p id="statusText" class="status-text">Verifying human...</p>
+
+                <div id="verify-form" style="width: 100%;">
+                    <div class="turnstile-container">
+                        <div class="cf-turnstile" data-theme="dark" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onCaptchaSuccess"></div>
+                    </div>
+                    <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY & CONTINUE</button>
                 </div>
             </div>
 
@@ -217,6 +223,33 @@ app.get('/verify', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
+                const circle = document.getElementById('ring');
+                const countdownEl = document.getElementById('countdown');
+                const statusTextEl = document.getElementById('statusText');
+
+                const radius = circle.r.baseVal.value;
+                const circumference = 2 * Math.PI * radius;
+                circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
+
+                let timeLeft = 3;
+                function setProgress(percent) {
+                    const offset = circumference - (percent / 100) * circumference;
+                    circle.style.strokeDashoffset = offset;
+                }
+                setProgress(100);
+
+                const timer = setInterval(() => {
+                    timeLeft--;
+                    if (timeLeft >= 0) {
+                        countdownEl.textContent = timeLeft;
+                        setProgress((timeLeft / 3) * 100);
+                        if (timeLeft === 1) statusTextEl.textContent = "Checking connection...";
+                    } else {
+                        clearInterval(timer);
+                        statusTextEl.textContent = "Complete Security Check";
+                    }
+                }, 1000);
+
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
                     turnstileResponseToken = token;
@@ -224,41 +257,24 @@ app.get('/verify', async (req, res) => {
                 }
 
                 async function processVerify() {
-                    document.getElementById('verify-form').style.display = 'none';
-                    document.getElementById('loader').style.display = 'block';
-
-                    let percent = 0;
-                    const pBar = document.getElementById('progress');
-                    const sText = document.getElementById('statusText');
-
-                    const interval = setInterval(() => {
-                        percent += 10;
-                        pBar.style.width = percent + '%';
-                        if (percent >= 50 && percent < 90) {
-                            sText.innerText = "REDIRECTING...";
-                        }
-                        if (percent >= 100) {
-                            clearInterval(interval);
-                        }
-                    }, 100);
+                    const vBtn = document.getElementById('vBtn');
+                    vBtn.disabled = true;
+                    statusTextEl.textContent = "Processing...";
 
                     try {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
                         const data = await res.json();
                         
-                        setTimeout(() => {
-                            if(data.success && data.url) {
-                                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                                    window.Telegram.WebApp.openLink(data.url);
-                                    window.Telegram.WebApp.close();
-                                } else {
-                                    window.location.href = data.url;
-                                }
+                        if(data.success && data.url) {
+                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                                window.Telegram.WebApp.openLink(data.url);
+                                window.Telegram.WebApp.close();
                             } else {
-                                window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
+                                window.location.href = data.url;
                             }
-                        }, 1200);
-
+                        } else {
+                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
+                        }
                     } catch(e) {
                         window.location.href = "/access-denied?reason=Network Error";
                     }
@@ -329,7 +345,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (UPDATED THEME)
+// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (/gate)
 // ----------------------------------------------------------------------
 app.get('/gate', async (req, res) => {
     const { token } = req.query;
@@ -359,16 +375,12 @@ app.get('/gate', async (req, res) => {
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
                 body {
-                    background-color: #121212;
-                    display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh; overflow: hidden;
+                    background-color: #121212; display: flex; justify-content: center;
+                    align-items: center; min-height: 100vh; overflow: hidden;
                 }
                 .card {
-                    background-color: #1a1a1a;
-                    border: 1px solid #2d2d2d;
-                    border-radius: 28px;
-                    width: 320px;
-                    padding: 35px 20px;
+                    background-color: #1a1a1a; border: 1px solid #2d2d2d;
+                    border-radius: 28px; width: 320px; padding: 35px 20px;
                     display: flex; flex-direction: column; align-items: center;
                     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
                 }
@@ -379,31 +391,16 @@ app.get('/gate', async (req, res) => {
                 }
                 .progress-ring { transform: rotate(-90deg); }
                 .progress-ring__circle {
-                    stroke-dasharray: 314.159;
-                    stroke-dashoffset: 0;
-                    transition: stroke-dashoffset 1s linear;
-                    stroke-linecap: round;
+                    stroke-dasharray: 314.159; stroke-dashoffset: 0;
+                    transition: stroke-dashoffset 1s linear; stroke-linecap: round;
                 }
-                .number {
-                    position: absolute; font-size: 2.2rem;
-                    font-weight: 700; color: #ffcc00;
-                }
-                .brand-title {
-                    color: #ffcc00; font-size: 1.1rem;
-                    letter-spacing: 1px; font-weight: 700;
-                    margin-bottom: 8px; text-transform: uppercase;
-                }
-                .section-title {
-                    color: #ffffff; font-size: 1.3rem;
-                    font-weight: 600; margin-bottom: 12px;
-                }
-                .status-text {
-                    color: #a0a0a0; font-size: 0.9rem; margin-bottom: 25px;
-                }
+                .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
+                .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
+                .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
+                .status-text { color: #a0a0a0; font-size: 0.9rem; margin-bottom: 25px; }
                 .badge {
-                    background-color: #2b250d; color: #ffcc00;
-                    border: 1px solid #4a3e0f; padding: 8px 18px;
-                    border-radius: 20px; font-size: 0.85rem;
+                    background-color: #2b250d; color: #ffcc00; border: 1px solid #4a3e0f;
+                    padding: 8px 18px; border-radius: 20px; font-size: 0.85rem;
                     font-weight: 600; display: flex; align-items: center; gap: 6px;
                 }
             </style>
@@ -412,18 +409,18 @@ app.get('/gate', async (req, res) => {
             <div class="card">
                 <div class="timer-container">
                     <svg class="progress-ring" width="120" height="120">
-                        <circle class="progress-ring__circle-bg" stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                         <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                     </svg>
                     <div id="countdown" class="number">3</div>
                 </div>
 
-                <h1 class="brand-title">AC PREMIUM</h1>
+                <h1 class="brand-title">HARI MOVIEZ</h1>
                 <h2 class="section-title">Security Verification</h2>
                 <p id="status-text" class="status-text">Verifying human...</p>
 
                 <div class="badge">
-                    <span>⚡</span> ac premium 
+                    <span>⚡</span> Hari Moviez
                 </div>
             </div>
 
@@ -442,26 +439,18 @@ app.get('/gate', async (req, res) => {
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
                 let timeLeft = 3;
-                const totalTime = 3;
-
                 function setProgress(percent) {
                     const offset = circumference - (percent / 100) * circumference;
                     circle.style.strokeDashoffset = offset;
                 }
-
                 setProgress(100);
 
                 const timer = setInterval(() => {
                     timeLeft--;
-                    
                     if (timeLeft >= 0) {
                         countdownEl.textContent = timeLeft;
-                        const percentage = (timeLeft / totalTime) * 100;
-                        setProgress(percentage);
-                        
-                        if (timeLeft === 1) {
-                            statusTextEl.textContent = "Checking connection...";
-                        }
+                        setProgress((timeLeft / 3) * 100);
+                        if (timeLeft === 1) statusTextEl.textContent = "Checking connection...";
                     } else {
                         clearInterval(timer);
                         statusTextEl.textContent = "Redirecting...";
@@ -520,7 +509,7 @@ app.get('/api/pass-gate', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 4️⃣ STEP 4: CLAIM PAGE
+// 4️⃣ STEP 4: CLAIM PAGE (/claim)
 // ----------------------------------------------------------------------
 app.get('/claim', async (req, res) => {
     const { token, hash } = req.query;
@@ -545,37 +534,65 @@ app.get('/claim', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Claim Gateway</title>
+            <title>Claim Security Gateway</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+                * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
                 body {
-                    background: #0b0f19; color: white;
-                    font-family: 'Segoe UI', -apple-system, sans-serif;
-                    display: flex; justify-content: center; align-items: center;
-                    min-height: 100vh;
+                    background-color: #121212; display: flex; justify-content: center;
+                    align-items: center; min-height: 100vh; overflow: hidden;
                 }
                 .card {
-                    background: rgba(19, 27, 46, 0.85);
-                    border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
-                    padding: 28px 20px; text-align: center; width: 90%; max-width: 380px;
+                    background-color: #1a1a1a; border: 1px solid #2d2d2d;
+                    border-radius: 28px; width: 320px; padding: 35px 20px;
+                    display: flex; flex-direction: column; align-items: center;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
                 }
+                .timer-container {
+                    position: relative; width: 120px; height: 120px;
+                    display: flex; justify-content: center; align-items: center;
+                    margin-bottom: 20px;
+                }
+                .progress-ring { transform: rotate(-90deg); }
+                .progress-ring__circle {
+                    stroke-dasharray: 314.159; stroke-dashoffset: 0;
+                    transition: stroke-dashoffset 1s linear; stroke-linecap: round;
+                }
+                .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
+                .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
+                .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
+                .status-text { color: #a0a0a0; font-size: 0.85rem; margin-bottom: 20px; }
+                
+                .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
                 .btn {
-                    background: linear-gradient(135deg, #00f3ff 0%, #00a6ff 100%);
-                    color: #000; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold;
-                    border-radius: 8px; cursor: pointer; width: 100%; margin-top: 15px;
+                    background: #ffcc00; color: #000; border: none; padding: 12px 20px;
+                    font-size: 14px; font-weight: bold; border-radius: 20px;
+                    cursor: pointer; width: 100%; transition: 0.3s;
                 }
-                .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+                .btn:disabled { background: #333; color: #777; cursor: not-allowed; }
             </style>
         </head>
         <body>
             <div class="card">
-                <h2>VERIFY TASK</h2>
-                <div style="display:flex; justify-content:center; margin-top:15px;">
-                    <div class="cf-turnstile" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onClaimCaptcha"></div>
+                <div class="timer-container">
+                    <svg class="progress-ring" width="120" height="120">
+                        <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                    </svg>
+                    <div id="countdown" class="number">3</div>
                 </div>
-                <button id="claimBtn" class="btn" onclick="executeClaim()" disabled>🎁 CLAIM YOUR TOKEN</button>
+
+                <h1 class="brand-title">HARI MOVIEZ</h1>
+                <h2 class="section-title">Final Check</h2>
+                <p id="statusText" class="status-text">Verifying human...</p>
+
+                <div style="width: 100%;">
+                    <div class="turnstile-container">
+                        <div class="cf-turnstile" data-theme="dark" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onClaimCaptcha"></div>
+                    </div>
+                    <button id="claimBtn" class="btn" onclick="executeClaim()" disabled>🎁 CLAIM YOUR TOKEN</button>
+                </div>
             </div>
 
             <script>
@@ -583,6 +600,33 @@ app.get('/claim', async (req, res) => {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
                 }
+
+                const circle = document.getElementById('ring');
+                const countdownEl = document.getElementById('countdown');
+                const statusTextEl = document.getElementById('statusText');
+
+                const radius = circle.r.baseVal.value;
+                const circumference = 2 * Math.PI * radius;
+                circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
+
+                let timeLeft = 3;
+                function setProgress(percent) {
+                    const offset = circumference - (percent / 100) * circumference;
+                    circle.style.strokeDashoffset = offset;
+                }
+                setProgress(100);
+
+                const timer = setInterval(() => {
+                    timeLeft--;
+                    if (timeLeft >= 0) {
+                        countdownEl.textContent = timeLeft;
+                        setProgress((timeLeft / 3) * 100);
+                        if (timeLeft === 1) statusTextEl.textContent = "Checking connection...";
+                    } else {
+                        clearInterval(timer);
+                        statusTextEl.textContent = "Click button below";
+                    }
+                }, 1000);
 
                 let claimCaptchaToken = "";
                 function onClaimCaptcha(token) {
@@ -593,7 +637,7 @@ app.get('/claim', async (req, res) => {
                 async function executeClaim() {
                     const btn = document.getElementById('claimBtn');
                     btn.disabled = true;
-                    btn.innerText = "VERIFYING...";
+                    statusTextEl.textContent = "VERIFYING...";
 
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
