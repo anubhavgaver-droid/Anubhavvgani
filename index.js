@@ -329,7 +329,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE
+// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (UPDATED THEME)
 // ----------------------------------------------------------------------
 app.get('/gate', async (req, res) => {
     const { token } = req.query;
@@ -354,33 +354,77 @@ app.get('/gate', async (req, res) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Anti-Bypass Inspection</title>
+            <title>Security Verification</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+                * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
                 body {
-                    background: #07090e; color: white;
-                    font-family: 'Segoe UI', -apple-system, sans-serif;
+                    background-color: #121212;
                     display: flex; justify-content: center; align-items: center;
                     min-height: 100vh; overflow: hidden;
                 }
                 .card {
-                    background: rgba(13, 17, 23, 0.9);
-                    border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 16px;
-                    padding: 30px 24px; text-align: center; width: 90%; max-width: 380px;
+                    background-color: #1a1a1a;
+                    border: 1px solid #2d2d2d;
+                    border-radius: 28px;
+                    width: 320px;
+                    padding: 35px 20px;
+                    display: flex; flex-direction: column; align-items: center;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
                 }
-                h2 { font-size: 18px; color: #00f3ff; margin-bottom: 6px; }
-                .progress-bar {
-                    width: 100%; height: 8px; background: rgba(255,255,255,0.1);
-                    border-radius: 4px; overflow: hidden; margin-top: 15px;
+                .timer-container {
+                    position: relative; width: 120px; height: 120px;
+                    display: flex; justify-content: center; align-items: center;
+                    margin-bottom: 25px;
                 }
-                .fill { width: 0%; height: 100%; background: #00f3ff; transition: width 0.1s linear; }
+                .progress-ring { transform: rotate(-90deg); }
+                .progress-ring__circle {
+                    stroke-dasharray: 314.159;
+                    stroke-dashoffset: 0;
+                    transition: stroke-dashoffset 1s linear;
+                    stroke-linecap: round;
+                }
+                .number {
+                    position: absolute; font-size: 2.2rem;
+                    font-weight: 700; color: #ffcc00;
+                }
+                .brand-title {
+                    color: #ffcc00; font-size: 1.1rem;
+                    letter-spacing: 1px; font-weight: 700;
+                    margin-bottom: 8px; text-transform: uppercase;
+                }
+                .section-title {
+                    color: #ffffff; font-size: 1.3rem;
+                    font-weight: 600; margin-bottom: 12px;
+                }
+                .status-text {
+                    color: #a0a0a0; font-size: 0.9rem; margin-bottom: 25px;
+                }
+                .badge {
+                    background-color: #2b250d; color: #ffcc00;
+                    border: 1px solid #4a3e0f; padding: 8px 18px;
+                    border-radius: 20px; font-size: 0.85rem;
+                    font-weight: 600; display: flex; align-items: center; gap: 6px;
+                }
             </style>
         </head>
         <body>
             <div class="card">
-                <h2>🔍 INSPECTING TRAFFIC...</h2>
-                <div class="progress-bar"><div id="progress" class="fill"></div></div>
+                <div class="timer-container">
+                    <svg class="progress-ring" width="120" height="120">
+                        <circle class="progress-ring__circle-bg" stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                    </svg>
+                    <div id="countdown" class="number">3</div>
+                </div>
+
+                <h1 class="brand-title">AC PREMIUM</h1>
+                <h2 class="section-title">Security Verification</h2>
+                <p id="status-text" class="status-text">Verifying human...</p>
+
+                <div class="badge">
+                    <span>⚡</span> ac premium 
+                </div>
             </div>
 
             <script>
@@ -389,15 +433,41 @@ app.get('/gate', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
-                let percent = 0;
-                const interval = setInterval(() => {
-                    percent += 10;
-                    document.getElementById('progress').style.width = percent + '%';
-                    if (percent >= 100) {
-                        clearInterval(interval);
+                const circle = document.getElementById('ring');
+                const countdownEl = document.getElementById('countdown');
+                const statusTextEl = document.getElementById('status-text');
+
+                const radius = circle.r.baseVal.value;
+                const circumference = 2 * Math.PI * radius;
+                circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
+
+                let timeLeft = 3;
+                const totalTime = 3;
+
+                function setProgress(percent) {
+                    const offset = circumference - (percent / 100) * circumference;
+                    circle.style.strokeDashoffset = offset;
+                }
+
+                setProgress(100);
+
+                const timer = setInterval(() => {
+                    timeLeft--;
+                    
+                    if (timeLeft >= 0) {
+                        countdownEl.textContent = timeLeft;
+                        const percentage = (timeLeft / totalTime) * 100;
+                        setProgress(percentage);
+                        
+                        if (timeLeft === 1) {
+                            statusTextEl.textContent = "Checking connection...";
+                        }
+                    } else {
+                        clearInterval(timer);
+                        statusTextEl.textContent = "Redirecting...";
                         passGate();
                     }
-                }, 150);
+                }, 1000);
 
                 async function passGate() {
                     try {
