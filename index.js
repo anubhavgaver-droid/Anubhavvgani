@@ -4,9 +4,6 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const app = express();
-// Trust proxy settings if behind Cloudflare/Render/Heroku to capture real IPs
-app.set('trust proxy', true);
-
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI; 
 
@@ -18,7 +15,7 @@ const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2Cr
 // 🔐 Postback Secret Key
 const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "Zender_Secret_Pass_8921";
 
-// ⚙️ POSTBACK REQUIREMENT FLAG: Set to TRUE to stop Shortlink Skipping
+// ⚙️ POSTBACK REQUIREMENT FLAG:
 const REQUIRE_POSTBACK = false; 
 
 let db;
@@ -38,15 +35,10 @@ async function connectDB() {
 }
 
 // Cryptographic HMAC Hash Generator
-function generateSecureHash(token, timestamp, ip) {
+function generateSecureHash(token, timestamp) {
     return crypto.createHmac('sha256', POSTBACK_SECRET)
-                 .update(`${token}_${timestamp}_${ip}`)
+                 .update(`${token}_${timestamp}`)
                  .digest('hex');
-}
-
-// Helper: Helper to extract Client IP
-function getClientIP(req) {
-    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection.remoteAddress;
 }
 
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
@@ -226,8 +218,6 @@ app.get('/verify', async (req, res) => {
             </div>
 
             <script>
-                const CURRENT_TOKEN = "${cleanToken}";
-
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
@@ -241,7 +231,7 @@ app.get('/verify', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000;
+                const totalDuration = 5000; // 5 Seconds
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -278,7 +268,7 @@ app.get('/verify', async (req, res) => {
                     statusTextEl.textContent = "Processing...";
 
                     try {
-                        const res = await fetch(\`/api/process-token?token=\${CURRENT_TOKEN}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
+                        const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
                         const data = await res.json();
                         
                         if(data.success && data.url) {
@@ -310,8 +300,6 @@ app.get('/verify', async (req, res) => {
 // ----------------------------------------------------------------------
 app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
-    const clientIP = getClientIP(req);
-    const userAgent = req.headers['user-agent'] || '';
 
     if (!token || !cf_token) return res.json({ success: false, message: "Missing parameters" });
 
@@ -319,8 +307,7 @@ app.get('/api/process-token', async (req, res) => {
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
             secret: TURNSTILE_SECRET_KEY,
-            response: cf_token,
-            remoteip: clientIP
+            response: cf_token
         }));
 
         if (!cfResponse.data.success) {
@@ -334,18 +321,9 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
-        // 🔒 Save User IP & User Agent to bind the session
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { 
-                $set: { 
-                    generated_at: Date.now(), 
-                    is_completed: false, 
-                    gate_passed: false,
-                    bound_ip: clientIP,
-                    bound_ua: userAgent
-                } 
-            }
+            { $set: { generated_at: Date.now(), is_completed: false, gate_passed: false } }
         );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
@@ -453,8 +431,6 @@ app.get('/gate', async (req, res) => {
             </div>
 
             <script>
-                const CURRENT_TOKEN = "${cleanToken}";
-
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
@@ -468,7 +444,7 @@ app.get('/gate', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000;
+                const totalDuration = 5000; // 5 Seconds
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -496,10 +472,10 @@ app.get('/gate', async (req, res) => {
 
                 async function passGate() {
                     try {
-                        const res = await fetch(\`/api/pass-gate?token=\${CURRENT_TOKEN}\`);
+                        const res = await fetch(\`/api/pass-gate?token=${cleanToken}\`);
                         const data = await res.json();
                         if (data.success) {
-                            window.location.href = \`/claim?token=\${CURRENT_TOKEN}&hash=\${data.hash}\`;
+                            window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
                         } else {
                             window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Check Failed")}\`;
                         }
@@ -520,8 +496,6 @@ app.get('/gate', async (req, res) => {
 // Secure Pass Gate API
 app.get('/api/pass-gate', async (req, res) => {
     const { token } = req.query;
-    const clientIP = getClientIP(req);
-
     if (!token) return res.json({ success: false, message: "Missing token." });
 
     try {
@@ -532,19 +506,8 @@ app.get('/api/pass-gate', async (req, res) => {
             return res.json({ success: false, message: "Invalid or used token." });
         }
 
-        // 🛡️ TIME CHECK: Fast-forward Execution Check (Anti-Bot)
-        const timePassed = Date.now() - (tokenDoc.generated_at || 0);
-        if (timePassed < 4000) { // Less than 4 seconds means an automated script passed it
-            return res.json({ success: false, message: "Bypass Bot Detected: Verification completed too fast!" });
-        }
-
-        // 🛡️ POSTBACK CHECK: Check if Shortlink task was actually performed
-        if (REQUIRE_POSTBACK && !tokenDoc.is_completed) {
-            return res.json({ success: false, message: "Bypass Detected: Shortlink was skipped!" });
-        }
-
         const timestamp = Date.now();
-        const hash = generateSecureHash(cleanToken, timestamp, clientIP);
+        const hash = generateSecureHash(cleanToken, timestamp);
 
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
@@ -562,7 +525,6 @@ app.get('/api/pass-gate', async (req, res) => {
 // ----------------------------------------------------------------------
 app.get('/claim', async (req, res) => {
     const { token, hash } = req.query;
-    const clientIP = getClientIP(req);
 
     if (!token || !hash) return res.status(400).send(renderAccessDeniedUI("🚫 Direct access strictly blocked. Complete verification process first."));
 
@@ -573,9 +535,9 @@ app.get('/claim', async (req, res) => {
         if (!tokenDoc) return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired token."));
         if (tokenDoc.is_used) return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
 
-        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time, clientIP);
+        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
         if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
-            return res.status(403).send(renderAccessDeniedUI("🛡️ BYPASS DETECTED: Invalid Security Hash or IP mismatch."));
+            return res.status(403).send(renderAccessDeniedUI("🛡️ BYPASS DETECTED: Invalid Security Hash."));
         }
 
         res.send(`
@@ -646,9 +608,6 @@ app.get('/claim', async (req, res) => {
             </div>
 
             <script>
-                const CURRENT_TOKEN = "${cleanToken}";
-                const CURRENT_HASH = "${hash}";
-
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
@@ -662,7 +621,7 @@ app.get('/claim', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000;
+                const totalDuration = 5000; // 5 Seconds
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -699,7 +658,7 @@ app.get('/claim', async (req, res) => {
                     statusTextEl.textContent = "VERIFYING...";
 
                     try {
-                        const res = await fetch(\`/api/execute-claim?token=\${CURRENT_TOKEN}&hash=\${CURRENT_HASH}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
+                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
                         const data = await res.json();
 
                         if (data.success && data.url) {
@@ -738,8 +697,6 @@ app.get('/claim', async (req, res) => {
 // ----------------------------------------------------------------------
 app.get('/api/execute-claim', async (req, res) => {
     const { token, hash, cf_token } = req.query;
-    const clientIP = getClientIP(req);
-    const userAgent = req.headers['user-agent'] || '';
 
     if (!token || !hash || !cf_token) return res.json({ success: false, message: "Token/Hash/Captcha missing." });
 
@@ -751,11 +708,6 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        // 🛡️ USER AGENT & IP MATCH CHECK
-        if (tokenDoc.bound_ua && tokenDoc.bound_ua !== userAgent) {
-            return res.json({ success: false, message: "BYPASS DETECTED: Device / Browser Mismatch!" });
-        }
-
         if (REQUIRE_POSTBACK && !tokenDoc.is_completed) {
             return res.json({ 
                 success: false, 
@@ -763,7 +715,7 @@ app.get('/api/execute-claim', async (req, res) => {
             });
         }
 
-        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time, clientIP);
+        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
         if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
             return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
         }
@@ -771,8 +723,7 @@ app.get('/api/execute-claim', async (req, res) => {
         const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
             secret: TURNSTILE_SECRET_KEY,
-            response: cf_token,
-            remoteip: clientIP
+            response: cf_token
         }));
 
         if (!cfResponse.data.success) {
