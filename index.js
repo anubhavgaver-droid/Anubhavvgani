@@ -4,19 +4,17 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI; 
-
 const DB_NAME = process.env.DB_NAME || "Cluovvoo";
 
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "0x4AAAAAAEW2Ci6bkvsSt9JE";
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAEW2CrKKwntMxBfDSRfXUr48arA";
 
-// 🔐 Postback Secret Key
 const POSTBACK_SECRET = process.env.POSTBACK_SECRET || "Zender_Secret_Pass_8921";
-
-// ⚙️ POSTBACK REQUIREMENT FLAG:
-const REQUIRE_POSTBACK = false; 
+const REQUIRE_POSTBACK = false; // Arolinks ke liye false rakha hai
 
 let db;
 
@@ -106,7 +104,7 @@ function renderAccessDeniedUI(reasonText) {
             <div class="badge-denied">[ ACCESS DENIED ]</div>
             <div class="status-icon">⚠️</div>
             <h1 class="title">Verification Failed</h1>
-            <p class="subtitle">Access restricted by security protocols.</p>
+            <p class="subtitle">We could not process your request due to a security violation.</p>
             <div class="reason-box">
                 <div class="reason-title">SYSTEM DIAGNOSTIC:</div>
                 <div class="reason-text">${reasonText}</div>
@@ -231,7 +229,7 @@ app.get('/verify', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000; // 5 Seconds
+                const totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -321,9 +319,20 @@ app.get('/api/process-token', async (req, res) => {
             return res.json({ success: false, message: "Token already used or expired!" });
         }
 
+        // 🌟 SIGNATURE GENERATION (MR SAGAR STYLE)
+        const timestamp = Date.now();
+        const signature = generateSecureHash(cleanToken, timestamp);
+
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { generated_at: Date.now(), is_completed: false, gate_passed: false } }
+            { 
+                $set: { 
+                    generated_at: timestamp, 
+                    is_completed: false, 
+                    gate_passed: false,
+                    sig: signature 
+                } 
+            }
         );
 
         const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
@@ -332,7 +341,8 @@ app.get('/api/process-token', async (req, res) => {
         }
 
         const hostUrl = req.protocol + '://' + req.get('host');
-        const targetProxyUrl = `${hostUrl}/gate?token=${cleanToken}`;
+        // 🌟 SIGNATURE ATTACHED TO TARGET PROXY URL
+        const targetProxyUrl = `${hostUrl}/gate/${cleanToken}?sig=${signature}___sagar31`;
 
         const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}`;
         const response = await axios.get(shortenerApiUrl);
@@ -351,15 +361,18 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (/gate)
+// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (/gate/:token)
 // ----------------------------------------------------------------------
-app.get('/gate', async (req, res) => {
-    const { token } = req.query;
+app.get('/gate/:token', async (req, res) => {
+    const { token } = req.params;
+    const { sig } = req.query;
 
     if (!token) return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
 
     try {
         const cleanToken = token.trim();
+        const cleanSig = sig ? sig.split('___')[0] : ''; // Remove ___sagar31 watermark
+
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
 
         if (!tokenDoc) {
@@ -367,7 +380,18 @@ app.get('/gate', async (req, res) => {
         }
 
         if (tokenDoc.is_used) {
-            return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
+            return res.status(403).send(renderAccessDeniedUI("⚠️ LINK EXPIRED OR ALREADY CLAIMED!"));
+        }
+
+        // 🛡️ CHECK 1: SIGNATURE VERIFICATION
+        if (tokenDoc.sig !== cleanSig) {
+            return res.status(403).send(renderAccessDeniedUI("🚨 TAMPERED LINK OR INVALID SIGNATURE DETECTED!"));
+        }
+
+        // 🛡️ CHECK 2: ANTI-BYPASS TIME CHECK (Min 12 Seconds Required)
+        const timeSpentInSeconds = (Date.now() - tokenDoc.generated_at) / 1000;
+        if (timeSpentInSeconds < 12) {
+            return res.status(403).send(renderAccessDeniedUI("⚠️ DIRECT PASTE OR SHARE DETECTED!<br>PLEASE COMPLETE ADS ON AROLINKS.COM."));
         }
 
         res.send(`
@@ -444,7 +468,7 @@ app.get('/gate', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000; // 5 Seconds
+                const totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -472,7 +496,7 @@ app.get('/gate', async (req, res) => {
 
                 async function passGate() {
                     try {
-                        const res = await fetch(\`/api/pass-gate?token=${cleanToken}\`);
+                        const res = await fetch(\`/api/pass-gate?token=${cleanToken}&sig=${cleanSig}\`);
                         const data = await res.json();
                         if (data.success) {
                             window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
@@ -495,7 +519,7 @@ app.get('/gate', async (req, res) => {
 
 // Secure Pass Gate API
 app.get('/api/pass-gate', async (req, res) => {
-    const { token } = req.query;
+    const { token, sig } = req.query;
     if (!token) return res.json({ success: false, message: "Missing token." });
 
     try {
@@ -504,6 +528,10 @@ app.get('/api/pass-gate', async (req, res) => {
 
         if (!tokenDoc || tokenDoc.is_used) {
             return res.json({ success: false, message: "Invalid or used token." });
+        }
+
+        if (tokenDoc.sig !== sig) {
+            return res.json({ success: false, message: "Invalid Signature!" });
         }
 
         const timestamp = Date.now();
@@ -621,7 +649,7 @@ app.get('/claim', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000; // 5 Seconds
+                const totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -708,13 +736,6 @@ app.get('/api/execute-claim', async (req, res) => {
             return res.json({ success: false, message: "Invalid or already used token." });
         }
 
-        if (REQUIRE_POSTBACK && !tokenDoc.is_completed) {
-            return res.json({ 
-                success: false, 
-                message: "🚫 BYPASS DETECTED: Shortlink task was skipped or not completed via Official Site!" 
-            });
-        }
-
         const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
         if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
             return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
@@ -746,32 +767,6 @@ app.get('/api/execute-claim', async (req, res) => {
     } catch (err) {
         console.error("Execute Claim Error:", err);
         return res.json({ success: false, message: "Server execution error." });
-    }
-});
-
-// ----------------------------------------------------------------------
-// 6️⃣ STEP 6: POSTBACK RECEIVER (Webhook)
-// ----------------------------------------------------------------------
-app.get('/api/postback', async (req, res) => {
-    const { token, secret } = req.query;
-
-    if (secret !== POSTBACK_SECRET) return res.status(401).send("Unauthorized Access");
-    if (!token) return res.status(400).send("Missing token parameter");
-
-    try {
-        const cleanToken = token.trim();
-        const updateResult = await db.collection('verify_tokens').updateOne(
-            { token: cleanToken },
-            { $set: { is_completed: true, postback_at: Date.now() } }
-        );
-
-        if (updateResult.matchedCount === 0) return res.status(404).send("Token not found");
-
-        console.log(`✅ Webhook Received Successfully for Token: ${cleanToken}`);
-        return res.status(200).send("OK");
-    } catch (err) {
-        console.error("Postback Processing Error:", err);
-        return res.status(500).send("Internal Server Error");
     }
 });
 
