@@ -65,7 +65,6 @@ function renderAccessDeniedUI(reasonText) {
             :root {
                 --bg-color: #0b0f19;
                 --card-bg: rgba(20, 26, 40, 0.75);
-                --yellow-glow: #e2e8f0;
                 --red-glow: #ff4757;
                 --red-dim: rgba(255, 71, 87, 0.15);
                 --text-main: #ffffff;
@@ -142,7 +141,7 @@ app.get('/access-denied', (req, res) => {
     res.send(renderAccessDeniedUI(reason));
 });
 
-// Helper Function for Common Winter & Foggy Theme CSS/JS
+// Helper Function for Common Winter & Foggy Theme CSS/JS with Animations
 function getWinterThemeStyles() {
     return `
         <style>
@@ -206,7 +205,7 @@ function getWinterThemeStyles() {
             
             .brand-title { color: #38bdf8; font-size: 1.1rem; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
             .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
-            .status-text { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; text-align: center; }
+            .status-text { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; text-align: center; height: 20px; transition: color 0.3s ease; }
             
             .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
             .btn {
@@ -219,6 +218,45 @@ function getWinterThemeStyles() {
             }
             .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5); }
             .btn:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
+
+            /* Tick Checkmark Animation CSS */
+            .success-checkmark { display: none; width: 80px; height: 80px; margin: 0 auto 10px; }
+            .check-icon {
+                width: 80px; height: 80px; position: relative; border-radius: 50%;
+                box-sizing: content-box; border: 4px solid #38bdf8;
+                box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+            }
+            .check-icon::before {
+                top: 3px; left: -2px; width: 30px; transform-origin: 100% 50%;
+                border-radius: 100px 0 0 100px;
+            }
+            .check-icon::after {
+                top: 0; left: 30px; width: 60px; transform-origin: 0 50%;
+                border-radius: 0 100px 100px 0; animation: rotate-circle 4.25s ease-in;
+            }
+            .check-icon::before, .check-icon::after {
+                content: ''; position: absolute; height: 100%; background: transparent; transform: rotate(-45deg);
+            }
+            .icon-line {
+                height: 5px; background-color: #38bdf8; display: block; border-radius: 2px;
+                position: absolute; z-index: 10;
+            }
+            .line-tip { top: 46px; left: 14px; width: 25px; transform: rotate(45deg); animation: icon-line-tip 0.75s; }
+            .line-long { top: 38px; right: 8px; width: 47px; transform: rotate(-45deg); animation: icon-line-long 0.75s; }
+            
+            @keyframes icon-line-tip {
+                0% { width: 0; left: 1px; top: 19px; }
+                54% { width: 0; left: 1px; top: 19px; }
+                70% { width: 50px; left: -8px; top: 37px; }
+                84% { width: 17px; left: 21px; top: 48px; }
+                100% { width: 25px; left: 14px; top: 46px; }
+            }
+            @keyframes icon-line-long {
+                0% { width: 0; right: 46px; top: 54px; }
+                65% { width: 0; right: 46px; top: 54px; }
+                84% { width: 55px; right: 0px; top: 35px; }
+                100% { width: 47px; right: 8px; top: 38px; }
+            }
 
             .footer {
                 position: relative; z-index: 2; margin-top: 25px;
@@ -271,7 +309,7 @@ app.get('/verify', async (req, res) => {
             <div class="fog-container"></div>
 
             <div class="card">
-                <div class="timer-container">
+                <div id="timerBox" class="timer-container">
                     <svg class="progress-ring" width="120" height="120">
                         <circle stroke="rgba(56, 189, 248, 0.15)" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                         <circle id="ring" class="progress-ring__circle" stroke="#38bdf8" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
@@ -279,9 +317,16 @@ app.get('/verify', async (req, res) => {
                     <div id="countdown" class="number">5</div>
                 </div>
 
+                <div id="successCheck" class="success-checkmark">
+                    <div class="check-icon">
+                        <span class="icon-line line-tip"></span>
+                        <span class="icon-line line-long"></span>
+                    </div>
+                </div>
+
                 <h1 class="brand-title">Ac Premium</h1>
                 <h2 class="section-title">Security Check</h2>
-                <p id="statusText" class="status-text">Verifying human...</p>
+                <p id="statusText" class="status-text">Initializing session...</p>
 
                 <div id="verify-form" style="width: 100%;">
                     <div class="turnstile-container">
@@ -300,6 +345,16 @@ app.get('/verify', async (req, res) => {
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
+                }
+
+                function haptic(type) {
+                    try {
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                            if (type === 'success') window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                            else if (type === 'impact') window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+                            else if (type === 'light') window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                        }
+                    } catch(e){}
                 }
 
                 for(let i=0; i<25; i++) {
@@ -326,6 +381,14 @@ app.get('/verify', async (req, res) => {
                 }
                 setProgress(100);
 
+                const countMsgs = {
+                    5: "Initializing secure session...",
+                    4: "Encrypting parameters...",
+                    3: "Checking Cloudflare Turnstile...",
+                    2: "Verifying system integrity...",
+                    1: "Almost ready, tap button below!"
+                };
+
                 let totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
@@ -336,7 +399,9 @@ app.get('/verify', async (req, res) => {
                     if (timeRemaining >= 0) {
                         countdownEl.textContent = displaySeconds;
                         setProgress((timeRemaining / totalDuration) * 100);
-                        if (displaySeconds === 1) statusTextEl.textContent = "Checking connection...";
+                        if (countMsgs[displaySeconds]) {
+                            statusTextEl.textContent = countMsgs[displaySeconds];
+                        }
                     } else {
                         clearInterval(timer);
                         countdownEl.textContent = "0";
@@ -347,6 +412,7 @@ app.get('/verify', async (req, res) => {
 
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
+                    haptic('light');
                     turnstileResponseToken = token;
                     document.getElementById('vBtn').disabled = false;
                 }
@@ -372,7 +438,16 @@ app.get('/verify', async (req, res) => {
                     }, 100);
                 }
 
+                function showSuccessAnimation() {
+                    document.getElementById('timerBox').style.display = 'none';
+                    document.getElementById('successCheck').style.display = 'block';
+                    statusTextEl.style.color = '#38bdf8';
+                    statusTextEl.textContent = "VERIFIED SUCCESSFULLY!";
+                    haptic('success');
+                }
+
                 async function processVerify() {
+                    haptic('impact');
                     const vBtn = document.getElementById('vBtn');
                     vBtn.disabled = true;
                     vBtn.innerHTML = "⏳ REDIRECTING...";
@@ -385,20 +460,23 @@ app.get('/verify', async (req, res) => {
                         
                         setTimeout(() => {
                             if(data.success && data.url) {
-                                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                                    window.Telegram.WebApp.openLink(data.url);
-                                    window.Telegram.WebApp.close();
-                                } else {
-                                    window.location.href = data.url;
-                                }
+                                showSuccessAnimation();
+                                setTimeout(() => {
+                                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                                        window.Telegram.WebApp.openLink(data.url);
+                                        window.Telegram.WebApp.close();
+                                    } else {
+                                        window.location.href = data.url;
+                                    }
+                                }, 1200);
                             } else {
                                 window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
                             }
-                        }, 5000);
+                        }, 4000);
                     } catch(e) {
                         setTimeout(() => {
                             window.location.href = "/access-denied?reason=Network Error";
-                        }, 5000);
+                        }, 4000);
                     }
                 }
             </script>
@@ -557,6 +635,14 @@ app.get('/gate', async (req, res) => {
                 const totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
+                const countMsgs = {
+                    5: "Validating Gate Request...",
+                    4: "Connecting Security Nodes...",
+                    3: "Verifying Anti-Bypass Keys...",
+                    2: "Securing Token Payload...",
+                    1: "Redirecting to Final Claim..."
+                };
+
                 function setProgress(percent) {
                     const offset = circumference - (percent / 100) * circumference;
                     circle.style.strokeDashoffset = offset;
@@ -570,7 +656,9 @@ app.get('/gate', async (req, res) => {
                     if (timeRemaining >= 0) {
                         countdownEl.textContent = displaySeconds;
                         setProgress((timeRemaining / totalDuration) * 100);
-                        if (displaySeconds === 1) statusTextEl.textContent = "Checking connection...";
+                        if (countMsgs[displaySeconds]) {
+                            statusTextEl.textContent = countMsgs[displaySeconds];
+                        }
                     } else {
                         clearInterval(timer);
                         countdownEl.textContent = "0";
@@ -666,7 +754,7 @@ app.get('/claim', async (req, res) => {
             <div class="fog-container"></div>
 
             <div class="card">
-                <div class="timer-container">
+                <div id="timerBox" class="timer-container">
                     <svg class="progress-ring" width="120" height="120">
                         <circle stroke="rgba(56, 189, 248, 0.15)" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                         <circle id="ring" class="progress-ring__circle" stroke="#38bdf8" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
@@ -674,9 +762,16 @@ app.get('/claim', async (req, res) => {
                     <div id="countdown" class="number">5</div>
                 </div>
 
+                <div id="successCheck" class="success-checkmark">
+                    <div class="check-icon">
+                        <span class="icon-line line-tip"></span>
+                        <span class="icon-line line-long"></span>
+                    </div>
+                </div>
+
                 <h1 class="brand-title">Ac Premium</h1>
                 <h2 class="section-title">Final Check</h2>
-                <p id="statusText" class="status-text">Verifying human...</p>
+                <p id="statusText" class="status-text">Initializing session...</p>
 
                 <div style="width: 100%;">
                     <div class="turnstile-container">
@@ -697,6 +792,16 @@ app.get('/claim', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
+                function haptic(type) {
+                    try {
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                            if (type === 'success') window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                            else if (type === 'impact') window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+                            else if (type === 'light') window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                        }
+                    } catch(e){}
+                }
+
                 for(let i=0; i<25; i++) {
                     let flake = document.createElement('div');
                     flake.className = 'snowflake';
@@ -715,6 +820,14 @@ app.get('/claim', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
+                const countMsgs = {
+                    5: "Preparing reward token...",
+                    4: "Verifying Captcha Token...",
+                    3: "Authorizing Telegram Protocol...",
+                    2: "Finalizing Token Release...",
+                    1: "Ready to Claim!"
+                };
+
                 let totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
@@ -731,7 +844,9 @@ app.get('/claim', async (req, res) => {
                     if (timeRemaining >= 0) {
                         countdownEl.textContent = displaySeconds;
                         setProgress((timeRemaining / totalDuration) * 100);
-                        if (displaySeconds === 1) statusTextEl.textContent = "Checking connection...";
+                        if (countMsgs[displaySeconds]) {
+                            statusTextEl.textContent = countMsgs[displaySeconds];
+                        }
                     } else {
                         clearInterval(timer);
                         countdownEl.textContent = "0";
@@ -742,6 +857,7 @@ app.get('/claim', async (req, res) => {
 
                 let claimCaptchaToken = "";
                 function onClaimCaptcha(token) {
+                    haptic('light');
                     claimCaptchaToken = token;
                     document.getElementById('claimBtn').disabled = false;
                 }
@@ -767,7 +883,16 @@ app.get('/claim', async (req, res) => {
                     }, 100);
                 }
 
+                function showSuccessAnimation() {
+                    document.getElementById('timerBox').style.display = 'none';
+                    document.getElementById('successCheck').style.display = 'block';
+                    statusTextEl.style.color = '#38bdf8';
+                    statusTextEl.textContent = "CLAIM SUCCESSFUL!";
+                    haptic('success');
+                }
+
                 async function executeClaim() {
+                    haptic('impact');
                     const btn = document.getElementById('claimBtn');
                     btn.disabled = true;
                     btn.innerHTML = "⏳ REDIRECTING...";
@@ -780,26 +905,29 @@ app.get('/claim', async (req, res) => {
 
                         setTimeout(() => {
                             if (data.success && data.url) {
-                                if (window.Telegram && window.Telegram.WebApp) {
-                                    if (window.Telegram.WebApp.openTelegramLink) {
-                                        window.Telegram.WebApp.openTelegramLink(data.url);
-                                    } else if (window.Telegram.WebApp.openLink) {
-                                        window.Telegram.WebApp.openLink(data.url);
+                                showSuccessAnimation();
+                                setTimeout(() => {
+                                    if (window.Telegram && window.Telegram.WebApp) {
+                                        if (window.Telegram.WebApp.openTelegramLink) {
+                                            window.Telegram.WebApp.openTelegramLink(data.url);
+                                        } else if (window.Telegram.WebApp.openLink) {
+                                            window.Telegram.WebApp.openLink(data.url);
+                                        } else {
+                                            window.location.href = data.url;
+                                        }
+                                        window.Telegram.WebApp.close();
                                     } else {
                                         window.location.href = data.url;
                                     }
-                                    window.Telegram.WebApp.close();
-                                } else {
-                                    window.location.href = data.url;
-                                }
+                                }, 1200);
                             } else {
                                 window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
                             }
-                        }, 5000);
+                        }, 4000);
                     } catch(e) {
                         setTimeout(() => {
                             window.location.href = "/access-denied?reason=Network verification error";
-                        }, 5000);
+                        }, 4000);
                     }
                 }
             </script>
