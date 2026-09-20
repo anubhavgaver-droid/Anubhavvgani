@@ -63,21 +63,27 @@ function renderAccessDeniedUI(reasonText) {
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
             :root {
-                --bg-color: #121212; --card-bg: #1a1a1a;
-                --yellow-glow: #ffcc00; --red-glow: #ff0055; --red-dim: rgba(255, 0, 85, 0.15);
-                --text-main: #ffffff; --text-sub: #a0a0a0;
+                --bg-color: #0b0f19;
+                --card-bg: rgba(20, 26, 40, 0.75);
+                --yellow-glow: #e2e8f0;
+                --red-glow: #ff4757;
+                --red-dim: rgba(255, 71, 87, 0.15);
+                --text-main: #ffffff;
+                --text-sub: #94a3b8;
             }
             * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
             body {
-                background-color: var(--bg-color); color: var(--text-main);
-                display: flex; justify-content: center; align-items: center;
+                background-color: var(--bg-color);
+                background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 100%);
+                color: var(--text-main);
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
                 min-height: 100vh; padding: 20px; overflow: hidden;
             }
             .hud-card {
-                position: relative; z-index: 1; width: 320px;
-                background: var(--card-bg); border: 1px solid #2d2d2d;
-                border-radius: 28px; padding: 35px 20px; text-align: center;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                position: relative; z-index: 2; width: 330px;
+                background: var(--card-bg); border: 1px solid rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(12px); border-radius: 28px; padding: 35px 20px 25px 20px; text-align: center;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
             }
             .badge-denied {
                 display: inline-block; padding: 6px 14px; border-radius: 20px;
@@ -89,16 +95,17 @@ function renderAccessDeniedUI(reasonText) {
             .title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 8px; }
             .subtitle { font-size: 13px; color: var(--text-sub); margin-bottom: 22px; line-height: 1.5; }
             .reason-box {
-                background: rgba(0, 0, 0, 0.4); border-left: 3px solid var(--yellow-glow);
+                background: rgba(0, 0, 0, 0.4); border-left: 3px solid var(--red-glow);
                 border-radius: 6px; padding: 14px; text-align: left; margin-bottom: 24px;
             }
-            .reason-title { font-size: 10px; text-transform: uppercase; color: var(--yellow-glow); letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
+            .reason-title { font-size: 10px; text-transform: uppercase; color: var(--red-glow); letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
             .reason-text { font-size: 13px; color: var(--text-main); font-weight: 500; }
             .btn-action {
                 display: block; width: 100%; padding: 12px; border-radius: 20px;
-                background: #2b250d; border: 1px solid #4a3e0f; color: #ffcc00;
+                background: linear-gradient(135deg, #334155, #1e293b); border: 1px solid rgba(255,255,255,0.1); color: #fff;
                 font-weight: 600; font-size: 14px; text-decoration: none; transition: 0.3s ease;
             }
+            .footer { margin-top: 25px; font-size: 11px; color: #64748b; text-align: center; z-index: 2; line-height: 1.6; }
         </style>
     </head>
     <body>
@@ -112,6 +119,10 @@ function renderAccessDeniedUI(reasonText) {
                 <div class="reason-text">${reasonText}</div>
             </div>
             <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">🔄 GET NEW LINK</a>
+        </div>
+        <div class="footer">
+            v1.0.1 | All Rights Reserved<br>
+            Powered by <b>GW CAR</b>
         </div>
         <script>
             if (window.Telegram && window.Telegram.WebApp) {
@@ -128,6 +139,107 @@ app.get('/access-denied', (req, res) => {
     const reason = req.query.reason || "Verification process failed.";
     res.send(renderAccessDeniedUI(reason));
 });
+
+// Helper Function for Common Winter & Foggy Theme CSS/JS
+function getWinterThemeStyles() {
+    return `
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body {
+                background: #090d16;
+                color: #e2e8f0;
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                min-height: 100vh; overflow: hidden; position: relative;
+            }
+            
+            /* Foggy Winter Background Glow */
+            .winter-bg {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                background: radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.12) 0%, rgba(15, 23, 42, 0.8) 70%, #070a12 100%);
+                z-index: 0;
+            }
+
+            /* Animated Fog Layer */
+            .fog-container {
+                position: absolute; width: 200%; height: 100%; top: 0; left: -50%;
+                background: url('https://raw.githubusercontent.com/daniel-ice/fog-effect/main/fog.png') repeat-x;
+                background-size: cover; opacity: 0.15;
+                animation: fogMove 30s linear infinite;
+                z-index: 1; pointer-events: none;
+            }
+            @keyframes fogMove {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(25%); }
+            }
+
+            /* Floating Snowflakes */
+            .snowflake {
+                position: absolute; top: -10px; color: #ffffff; opacity: 0.6;
+                font-size: 1em; animation: fall linear infinite; z-index: 1; pointer-events: none;
+            }
+            @keyframes fall {
+                0% { transform: translateY(-10px) rotate(0deg); opacity: 0.8; }
+                100% { transform: translateY(100vh) rotate(360deg); opacity: 0.2; }
+            }
+
+            .card {
+                position: relative; z-index: 2;
+                background: rgba(15, 23, 42, 0.7);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+                border-radius: 28px; width: 330px; padding: 35px 20px 25px 20px;
+                display: flex; flex-direction: column; align-items: center;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(255, 255, 255, 0.03);
+            }
+
+            .timer-container {
+                position: relative; width: 120px; height: 120px;
+                display: flex; justify-content: center; align-items: center;
+                margin-bottom: 20px;
+            }
+            .progress-ring { transform: rotate(-90deg); }
+            .progress-ring__circle {
+                stroke-dasharray: 314.159; stroke-dashoffset: 0;
+                transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
+                filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
+            }
+            .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
+            
+            .brand-title { color: #38bdf8; font-size: 1.1rem; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+            .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
+            .status-text { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; }
+            
+            .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
+            .btn {
+                background: linear-gradient(135deg, #38bdf8, #0284c7);
+                color: #ffffff; border: none; padding: 13px 20px;
+                font-size: 14px; font-weight: 700; border-radius: 20px;
+                cursor: pointer; width: 100%; transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+                letter-spacing: 0.5px;
+            }
+            .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5); }
+            .btn:disabled { background: #1e293b; color: #475569; cursor: not-allowed; box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
+
+            /* Redirection Overlay Smoke/Fog Animation */
+            .redirect-overlay {
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(9, 13, 22, 0.92); backdrop-filter: blur(20px);
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
+            }
+            .redirect-overlay.active { opacity: 1; pointer-events: all; }
+            .overlay-timer { font-size: 3.5rem; font-weight: 800; color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.8); margin-bottom: 10px; }
+            .overlay-text { font-size: 1.1rem; color: #e2e8f0; font-weight: 600; letter-spacing: 1px; }
+
+            .footer {
+                position: relative; z-index: 2; margin-top: 25px;
+                font-size: 11px; color: #64748b; text-align: center; line-height: 1.6;
+            }
+            .footer b { color: #94a3b8; }
+        </style>
+    `;
+}
 
 // ----------------------------------------------------------------------
 // 1️⃣ STEP 1: INITIAL VERIFICATION PAGE (/verify)
@@ -159,48 +271,17 @@ app.get('/verify', async (req, res) => {
             <title>Security Verification</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-            <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-                body {
-                    background-color: #121212; display: flex; justify-content: center;
-                    align-items: center; min-height: 100vh; overflow: hidden;
-                }
-                .card {
-                    background-color: #1a1a1a; border: 1px solid #2d2d2d;
-                    border-radius: 28px; width: 320px; padding: 35px 20px;
-                    display: flex; flex-direction: column; align-items: center;
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                }
-                .timer-container {
-                    position: relative; width: 120px; height: 120px;
-                    display: flex; justify-content: center; align-items: center;
-                    margin-bottom: 20px;
-                }
-                .progress-ring { transform: rotate(-90deg); }
-                .progress-ring__circle {
-                    stroke-dasharray: 314.159; stroke-dashoffset: 0;
-                    transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
-                }
-                .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
-                .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
-                .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
-                .status-text { color: #a0a0a0; font-size: 0.85rem; margin-bottom: 20px; }
-                
-                .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
-                .btn {
-                    background: #ffcc00; color: #000; border: none; padding: 12px 20px;
-                    font-size: 14px; font-weight: bold; border-radius: 20px;
-                    cursor: pointer; width: 100%; transition: 0.3s;
-                }
-                .btn:disabled { background: #333; color: #777; cursor: not-allowed; }
-            </style>
+            ${getWinterThemeStyles()}
         </head>
         <body>
+            <div class="winter-bg"></div>
+            <div class="fog-container"></div>
+
             <div class="card">
                 <div class="timer-container">
                     <svg class="progress-ring" width="120" height="120">
-                        <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
-                        <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle stroke="rgba(56, 189, 248, 0.15)" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle id="ring" class="progress-ring__circle" stroke="#38bdf8" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                     </svg>
                     <div id="countdown" class="number">5</div>
                 </div>
@@ -217,10 +298,32 @@ app.get('/verify', async (req, res) => {
                 </div>
             </div>
 
+            <div class="footer">
+                v1.0.1 | All Rights Reserved<br>
+                Powered by <b>GW CAR</b>
+            </div>
+
+            <!-- Redirecting Fog Overlay -->
+            <div id="redirectOverlay" class="redirect-overlay">
+                <div id="overlayTimer" class="overlay-timer">5</div>
+                <div class="overlay-text">Redirecting... Please Wait</div>
+            </div>
+
             <script>
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
+                }
+
+                // Create Snowflakes
+                for(let i=0; i<25; i++) {
+                    let flake = document.createElement('div');
+                    flake.className = 'snowflake';
+                    flake.innerHTML = '❄';
+                    flake.style.left = Math.random() * 100 + 'vw';
+                    flake.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                    flake.style.fontSize = (Math.random() * 10 + 10) + 'px';
+                    document.body.appendChild(flake);
                 }
 
                 const circle = document.getElementById('ring');
@@ -231,7 +334,7 @@ app.get('/verify', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000; // 5 Seconds
+                const totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -265,24 +368,44 @@ app.get('/verify', async (req, res) => {
                 async function processVerify() {
                     const vBtn = document.getElementById('vBtn');
                     vBtn.disabled = true;
-                    statusTextEl.textContent = "Processing...";
+
+                    // Show 5 Second Overlay Animation
+                    const overlay = document.getElementById('redirectOverlay');
+                    const overlayTimer = document.getElementById('overlayTimer');
+                    overlay.classList.add('active');
+
+                    let redirectSecs = 5;
+                    overlayTimer.textContent = redirectSecs;
+
+                    const redirectInterval = setInterval(() => {
+                        redirectSecs--;
+                        if (redirectSecs >= 0) {
+                            overlayTimer.textContent = redirectSecs;
+                        } else {
+                            clearInterval(redirectInterval);
+                        }
+                    }, 1000);
 
                     try {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
                         const data = await res.json();
                         
-                        if(data.success && data.url) {
-                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                                window.Telegram.WebApp.openLink(data.url);
-                                window.Telegram.WebApp.close();
+                        setTimeout(() => {
+                            if(data.success && data.url) {
+                                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                                    window.Telegram.WebApp.openLink(data.url);
+                                    window.Telegram.WebApp.close();
+                                } else {
+                                    window.location.href = data.url;
+                                }
                             } else {
-                                window.location.href = data.url;
+                                window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
                             }
-                        } else {
-                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
-                        }
+                        }, 5000); // 5 Seconds Delay for Redirection
                     } catch(e) {
-                        window.location.href = "/access-denied?reason=Network Error";
+                        setTimeout(() => {
+                            window.location.href = "/access-denied?reason=Network Error";
+                        }, 5000);
                     }
                 }
             </script>
@@ -296,7 +419,7 @@ app.get('/verify', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK & INIT TRACKING (UPDATED WITH ALIAS)
+// 2️⃣ STEP 2: GENERATE SHORTLINK & INIT TRACKING (WITH ALIAS)
 // ----------------------------------------------------------------------
 app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
@@ -334,7 +457,7 @@ app.get('/api/process-token', async (req, res) => {
         const hostUrl = req.protocol + '://' + req.get('host');
         const targetProxyUrl = `${hostUrl}/gate?token=${cleanToken}`;
 
-        // ⚡ UPDATED LINE: Added &alias=${cleanToken} so shortener generates exact 12-13 digit token link
+        // ⚡ Shortener Custom Alias Pass
         const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}&alias=${cleanToken}`;
         
         const response = await axios.get(shortenerApiUrl);
@@ -380,45 +503,24 @@ app.get('/gate', async (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Security Verification</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
+            ${getWinterThemeStyles()}
             <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-                body {
-                    background-color: #121212; display: flex; justify-content: center;
-                    align-items: center; min-height: 100vh; overflow: hidden;
-                }
-                .card {
-                    background-color: #1a1a1a; border: 1px solid #2d2d2d;
-                    border-radius: 28px; width: 320px; padding: 35px 20px;
-                    display: flex; flex-direction: column; align-items: center;
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                }
-                .timer-container {
-                    position: relative; width: 120px; height: 120px;
-                    display: flex; justify-content: center; align-items: center;
-                    margin-bottom: 25px;
-                }
-                .progress-ring { transform: rotate(-90deg); }
-                .progress-ring__circle {
-                    stroke-dasharray: 314.159; stroke-dashoffset: 0;
-                    transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
-                }
-                .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
-                .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
-                .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
-                .status-text { color: #a0a0a0; font-size: 0.9rem; margin-bottom: 25px; }
                 .badge {
-                    background-color: #2b250d; color: #ffcc00; border: 1px solid #4a3e0f;
+                    background-color: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);
                     padding: 8px 18px; border-radius: 20px; font-size: 0.85rem;
                     font-weight: 600; display: flex; align-items: center; gap: 6px;
                 }
             </style>
         </head>
         <body>
+            <div class="winter-bg"></div>
+            <div class="fog-container"></div>
+
             <div class="card">
                 <div class="timer-container">
                     <svg class="progress-ring" width="120" height="120">
-                        <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
-                        <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle stroke="rgba(56, 189, 248, 0.15)" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle id="ring" class="progress-ring__circle" stroke="#38bdf8" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                     </svg>
                     <div id="countdown" class="number">5</div>
                 </div>
@@ -432,10 +534,25 @@ app.get('/gate', async (req, res) => {
                 </div>
             </div>
 
+            <div class="footer">
+                v1.0.1 | All Rights Reserved<br>
+                Powered by <b>GW CAR</b>
+            </div>
+
             <script>
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
+                }
+
+                for(let i=0; i<25; i++) {
+                    let flake = document.createElement('div');
+                    flake.className = 'snowflake';
+                    flake.innerHTML = '❄';
+                    flake.style.left = Math.random() * 100 + 'vw';
+                    flake.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                    flake.style.fontSize = (Math.random() * 10 + 10) + 'px';
+                    document.body.appendChild(flake);
                 }
 
                 const circle = document.getElementById('ring');
@@ -446,7 +563,7 @@ app.get('/gate', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000; // 5 Seconds
+                const totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -551,48 +668,17 @@ app.get('/claim', async (req, res) => {
             <title>Claim Security Gateway</title>
             <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-            <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-                body {
-                    background-color: #121212; display: flex; justify-content: center;
-                    align-items: center; min-height: 100vh; overflow: hidden;
-                }
-                .card {
-                    background-color: #1a1a1a; border: 1px solid #2d2d2d;
-                    border-radius: 28px; width: 320px; padding: 35px 20px;
-                    display: flex; flex-direction: column; align-items: center;
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                }
-                .timer-container {
-                    position: relative; width: 120px; height: 120px;
-                    display: flex; justify-content: center; align-items: center;
-                    margin-bottom: 20px;
-                }
-                .progress-ring { transform: rotate(-90deg); }
-                .progress-ring__circle {
-                    stroke-dasharray: 314.159; stroke-dashoffset: 0;
-                    transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
-                }
-                .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #ffcc00; }
-                .brand-title { color: #ffcc00; font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
-                .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
-                .status-text { color: #a0a0a0; font-size: 0.85rem; margin-bottom: 20px; }
-                
-                .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
-                .btn {
-                    background: #ffcc00; color: #000; border: none; padding: 12px 20px;
-                    font-size: 14px; font-weight: bold; border-radius: 20px;
-                    cursor: pointer; width: 100%; transition: 0.3s;
-                }
-                .btn:disabled { background: #333; color: #777; cursor: not-allowed; }
-            </style>
+            ${getWinterThemeStyles()}
         </head>
         <body>
+            <div class="winter-bg"></div>
+            <div class="fog-container"></div>
+
             <div class="card">
                 <div class="timer-container">
                     <svg class="progress-ring" width="120" height="120">
-                        <circle stroke="#332a00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
-                        <circle id="ring" class="progress-ring__circle" stroke="#ffcc00" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle stroke="rgba(56, 189, 248, 0.15)" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle id="ring" class="progress-ring__circle" stroke="#38bdf8" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
                     </svg>
                     <div id="countdown" class="number">5</div>
                 </div>
@@ -609,10 +695,31 @@ app.get('/claim', async (req, res) => {
                 </div>
             </div>
 
+            <div class="footer">
+                v1.0.1 | All Rights Reserved<br>
+                Powered by <b>GW CAR</b>
+            </div>
+
+            <!-- Redirecting Fog Overlay -->
+            <div id="redirectOverlay" class="redirect-overlay">
+                <div id="overlayTimer" class="overlay-timer">5</div>
+                <div class="overlay-text">Finalizing Claim... Please Wait</div>
+            </div>
+
             <script>
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
+                }
+
+                for(let i=0; i<25; i++) {
+                    let flake = document.createElement('div');
+                    flake.className = 'snowflake';
+                    flake.innerHTML = '❄';
+                    flake.style.left = Math.random() * 100 + 'vw';
+                    flake.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                    flake.style.fontSize = (Math.random() * 10 + 10) + 'px';
+                    document.body.appendChild(flake);
                 }
 
                 const circle = document.getElementById('ring');
@@ -623,7 +730,7 @@ app.get('/claim', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000; // 5 Seconds
+                const totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -657,30 +764,49 @@ app.get('/claim', async (req, res) => {
                 async function executeClaim() {
                     const btn = document.getElementById('claimBtn');
                     btn.disabled = true;
-                    statusTextEl.textContent = "VERIFYING...";
+
+                    const overlay = document.getElementById('redirectOverlay');
+                    const overlayTimer = document.getElementById('overlayTimer');
+                    overlay.classList.add('active');
+
+                    let redirectSecs = 5;
+                    overlayTimer.textContent = redirectSecs;
+
+                    const redirectInterval = setInterval(() => {
+                        redirectSecs--;
+                        if (redirectSecs >= 0) {
+                            overlayTimer.textContent = redirectSecs;
+                        } else {
+                            clearInterval(redirectInterval);
+                        }
+                    }, 1000);
 
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
                         const data = await res.json();
 
-                        if (data.success && data.url) {
-                            if (window.Telegram && window.Telegram.WebApp) {
-                                if (window.Telegram.WebApp.openTelegramLink) {
-                                    window.Telegram.WebApp.openTelegramLink(data.url);
-                                } else if (window.Telegram.WebApp.openLink) {
-                                    window.Telegram.WebApp.openLink(data.url);
+                        setTimeout(() => {
+                            if (data.success && data.url) {
+                                if (window.Telegram && window.Telegram.WebApp) {
+                                    if (window.Telegram.WebApp.openTelegramLink) {
+                                        window.Telegram.WebApp.openTelegramLink(data.url);
+                                    } else if (window.Telegram.WebApp.openLink) {
+                                        window.Telegram.WebApp.openLink(data.url);
+                                    } else {
+                                        window.location.href = data.url;
+                                    }
+                                    window.Telegram.WebApp.close();
                                 } else {
                                     window.location.href = data.url;
                                 }
-                                window.Telegram.WebApp.close();
                             } else {
-                                window.location.href = data.url;
+                                window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
                             }
-                        } else {
-                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
-                        }
+                        }, 5000); // 5 Seconds Delay
                     } catch(e) {
-                        window.location.href = "/access-denied?reason=Network verification error";
+                        setTimeout(() => {
+                            window.location.href = "/access-denied?reason=Network verification error";
+                        }, 5000);
                     }
                 }
             </script>
