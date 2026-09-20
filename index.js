@@ -106,6 +106,8 @@ function renderAccessDeniedUI(reasonText) {
                 font-weight: 600; font-size: 14px; text-decoration: none; transition: 0.3s ease;
             }
             .footer { margin-top: 25px; font-size: 11px; color: #64748b; text-align: center; z-index: 2; line-height: 1.6; }
+            .footer-link { color: #38bdf8; text-decoration: none; font-weight: bold; transition: color 0.2s; }
+            .footer-link:hover { color: #7dd3fc; text-decoration: underline; }
         </style>
     </head>
     <body>
@@ -121,8 +123,8 @@ function renderAccessDeniedUI(reasonText) {
             <a href="https://t.me/SmartfilestorebyAcbot" class="btn-action">🔄 GET NEW LINK</a>
         </div>
         <div class="footer">
-            v1.0.1 | All Rights Reserved<br>
-            Powered by <b>GW CAR</b>
+            © 2026 All Rights Reserved<br>
+            Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
         </div>
         <script>
             if (window.Telegram && window.Telegram.WebApp) {
@@ -152,14 +154,12 @@ function getWinterThemeStyles() {
                 min-height: 100vh; overflow: hidden; position: relative;
             }
             
-            /* Foggy Winter Background Glow */
             .winter-bg {
                 position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                 background: radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.12) 0%, rgba(15, 23, 42, 0.8) 70%, #070a12 100%);
                 z-index: 0;
             }
 
-            /* Animated Fog Layer */
             .fog-container {
                 position: absolute; width: 200%; height: 100%; top: 0; left: -50%;
                 background: url('https://raw.githubusercontent.com/daniel-ice/fog-effect/main/fog.png') repeat-x;
@@ -172,7 +172,6 @@ function getWinterThemeStyles() {
                 100% { transform: translateX(25%); }
             }
 
-            /* Floating Snowflakes */
             .snowflake {
                 position: absolute; top: -10px; color: #ffffff; opacity: 0.6;
                 font-size: 1em; animation: fall linear infinite; z-index: 1; pointer-events: none;
@@ -207,7 +206,7 @@ function getWinterThemeStyles() {
             
             .brand-title { color: #38bdf8; font-size: 1.1rem; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
             .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
-            .status-text { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; }
+            .status-text { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; text-align: center; }
             
             .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
             .btn {
@@ -219,24 +218,18 @@ function getWinterThemeStyles() {
                 letter-spacing: 0.5px;
             }
             .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5); }
-            .btn:disabled { background: #1e293b; color: #475569; cursor: not-allowed; box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
-
-            /* Redirection Overlay Smoke/Fog Animation */
-            .redirect-overlay {
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(9, 13, 22, 0.92); backdrop-filter: blur(20px);
-                display: flex; flex-direction: column; justify-content: center; align-items: center;
-                z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
-            }
-            .redirect-overlay.active { opacity: 1; pointer-events: all; }
-            .overlay-timer { font-size: 3.5rem; font-weight: 800; color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.8); margin-bottom: 10px; }
-            .overlay-text { font-size: 1.1rem; color: #e2e8f0; font-weight: 600; letter-spacing: 1px; }
+            .btn:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
 
             .footer {
                 position: relative; z-index: 2; margin-top: 25px;
                 font-size: 11px; color: #64748b; text-align: center; line-height: 1.6;
             }
-            .footer b { color: #94a3b8; }
+            .footer-link {
+                color: #38bdf8; text-decoration: none; font-weight: bold; transition: color 0.2s;
+            }
+            .footer-link:hover {
+                color: #7dd3fc; text-decoration: underline;
+            }
         </style>
     `;
 }
@@ -299,14 +292,8 @@ app.get('/verify', async (req, res) => {
             </div>
 
             <div class="footer">
-                v1.0.1 | All Rights Reserved<br>
-                Powered by <b>GW CAR</b>
-            </div>
-
-            <!-- Redirecting Fog Overlay -->
-            <div id="redirectOverlay" class="redirect-overlay">
-                <div id="overlayTimer" class="overlay-timer">5</div>
-                <div class="overlay-text">Redirecting... Please Wait</div>
+                © 2026 All Rights Reserved<br>
+                Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
             </div>
 
             <script>
@@ -315,7 +302,6 @@ app.get('/verify', async (req, res) => {
                     window.Telegram.WebApp.expand();
                 }
 
-                // Create Snowflakes
                 for(let i=0; i<25; i++) {
                     let flake = document.createElement('div');
                     flake.className = 'snowflake';
@@ -334,16 +320,16 @@ app.get('/verify', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000;
-                let timeRemaining = totalDuration;
-
                 function setProgress(percent) {
                     const offset = circumference - (percent / 100) * circumference;
                     circle.style.strokeDashoffset = offset;
                 }
                 setProgress(100);
 
-                const timer = setInterval(() => {
+                let totalDuration = 5000;
+                let timeRemaining = totalDuration;
+
+                let timer = setInterval(() => {
                     timeRemaining -= 100;
                     const displaySeconds = Math.ceil(timeRemaining / 1000);
                     
@@ -365,26 +351,33 @@ app.get('/verify', async (req, res) => {
                     document.getElementById('vBtn').disabled = false;
                 }
 
+                function startSecondaryCountdown() {
+                    let duration = 5000;
+                    let remaining = duration;
+                    countdownEl.textContent = "5";
+                    setProgress(100);
+                    statusTextEl.textContent = "Redirecting, Please Wait...";
+
+                    let reTimer = setInterval(() => {
+                        remaining -= 100;
+                        const secs = Math.ceil(remaining / 1000);
+                        if (remaining >= 0) {
+                            countdownEl.textContent = secs;
+                            setProgress((remaining / duration) * 100);
+                        } else {
+                            clearInterval(reTimer);
+                            countdownEl.textContent = "0";
+                            setProgress(0);
+                        }
+                    }, 100);
+                }
+
                 async function processVerify() {
                     const vBtn = document.getElementById('vBtn');
                     vBtn.disabled = true;
+                    vBtn.innerHTML = "⏳ REDIRECTING...";
 
-                    // Show 5 Second Overlay Animation
-                    const overlay = document.getElementById('redirectOverlay');
-                    const overlayTimer = document.getElementById('overlayTimer');
-                    overlay.classList.add('active');
-
-                    let redirectSecs = 5;
-                    overlayTimer.textContent = redirectSecs;
-
-                    const redirectInterval = setInterval(() => {
-                        redirectSecs--;
-                        if (redirectSecs >= 0) {
-                            overlayTimer.textContent = redirectSecs;
-                        } else {
-                            clearInterval(redirectInterval);
-                        }
-                    }, 1000);
+                    startSecondaryCountdown();
 
                     try {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
@@ -401,7 +394,7 @@ app.get('/verify', async (req, res) => {
                             } else {
                                 window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
                             }
-                        }, 5000); // 5 Seconds Delay for Redirection
+                        }, 5000);
                     } catch(e) {
                         setTimeout(() => {
                             window.location.href = "/access-denied?reason=Network Error";
@@ -419,7 +412,7 @@ app.get('/verify', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK & INIT TRACKING (WITH ALIAS)
+// 2️⃣ STEP 2: GENERATE SHORTLINK & INIT TRACKING
 // ----------------------------------------------------------------------
 app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
@@ -457,11 +450,9 @@ app.get('/api/process-token', async (req, res) => {
         const hostUrl = req.protocol + '://' + req.get('host');
         const targetProxyUrl = `${hostUrl}/gate?token=${cleanToken}`;
 
-        // ⚡ Shortener Custom Alias Pass
         const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}&alias=${cleanToken}`;
         
         const response = await axios.get(shortenerApiUrl);
-        
         const shortUrl = response.data.shortenedUrl || response.data.url;
 
         if (shortUrl) {
@@ -535,8 +526,8 @@ app.get('/gate', async (req, res) => {
             </div>
 
             <div class="footer">
-                v1.0.1 | All Rights Reserved<br>
-                Powered by <b>GW CAR</b>
+                © 2026 All Rights Reserved<br>
+                Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
             </div>
 
             <script>
@@ -696,14 +687,8 @@ app.get('/claim', async (req, res) => {
             </div>
 
             <div class="footer">
-                v1.0.1 | All Rights Reserved<br>
-                Powered by <b>GW CAR</b>
-            </div>
-
-            <!-- Redirecting Fog Overlay -->
-            <div id="redirectOverlay" class="redirect-overlay">
-                <div id="overlayTimer" class="overlay-timer">5</div>
-                <div class="overlay-text">Finalizing Claim... Please Wait</div>
+                © 2026 All Rights Reserved<br>
+                Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
             </div>
 
             <script>
@@ -730,7 +715,7 @@ app.get('/claim', async (req, res) => {
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
-                const totalDuration = 5000;
+                let totalDuration = 5000;
                 let timeRemaining = totalDuration;
 
                 function setProgress(percent) {
@@ -739,7 +724,7 @@ app.get('/claim', async (req, res) => {
                 }
                 setProgress(100);
 
-                const timer = setInterval(() => {
+                let timer = setInterval(() => {
                     timeRemaining -= 100;
                     const displaySeconds = Math.ceil(timeRemaining / 1000);
                     
@@ -761,25 +746,33 @@ app.get('/claim', async (req, res) => {
                     document.getElementById('claimBtn').disabled = false;
                 }
 
+                function startSecondaryCountdown() {
+                    let duration = 5000;
+                    let remaining = duration;
+                    countdownEl.textContent = "5";
+                    setProgress(100);
+                    statusTextEl.textContent = "Finalizing Claim, Please Wait...";
+
+                    let reTimer = setInterval(() => {
+                        remaining -= 100;
+                        const secs = Math.ceil(remaining / 1000);
+                        if (remaining >= 0) {
+                            countdownEl.textContent = secs;
+                            setProgress((remaining / duration) * 100);
+                        } else {
+                            clearInterval(reTimer);
+                            countdownEl.textContent = "0";
+                            setProgress(0);
+                        }
+                    }, 100);
+                }
+
                 async function executeClaim() {
                     const btn = document.getElementById('claimBtn');
                     btn.disabled = true;
+                    btn.innerHTML = "⏳ REDIRECTING...";
 
-                    const overlay = document.getElementById('redirectOverlay');
-                    const overlayTimer = document.getElementById('overlayTimer');
-                    overlay.classList.add('active');
-
-                    let redirectSecs = 5;
-                    overlayTimer.textContent = redirectSecs;
-
-                    const redirectInterval = setInterval(() => {
-                        redirectSecs--;
-                        if (redirectSecs >= 0) {
-                            overlayTimer.textContent = redirectSecs;
-                        } else {
-                            clearInterval(redirectInterval);
-                        }
-                    }, 1000);
+                    startSecondaryCountdown();
 
                     try {
                         const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
@@ -802,7 +795,7 @@ app.get('/claim', async (req, res) => {
                             } else {
                                 window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
                             }
-                        }, 5000); // 5 Seconds Delay
+                        }, 5000);
                     } catch(e) {
                         setTimeout(() => {
                             window.location.href = "/access-denied?reason=Network verification error";
