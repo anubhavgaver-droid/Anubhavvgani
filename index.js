@@ -60,7 +60,6 @@ function renderAccessDeniedUI(reasonText) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Access Denied - Security Gateway</title>
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
             :root {
                 --bg-color: #0b0f19;
@@ -125,12 +124,6 @@ function renderAccessDeniedUI(reasonText) {
             © 2026 All Rights Reserved<br>
             Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
         </div>
-        <script>
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.ready();
-                window.Telegram.WebApp.expand();
-            }
-        </script>
     </body>
     </html>
     `;
@@ -300,7 +293,6 @@ app.get('/verify', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Security Verification</title>
-            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             ${getWinterThemeStyles()}
         </head>
@@ -342,21 +334,6 @@ app.get('/verify', async (req, res) => {
             </div>
 
             <script>
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-
-                function haptic(type) {
-                    try {
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                            if (type === 'success') window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                            else if (type === 'impact') window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-                            else if (type === 'light') window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-                        }
-                    } catch(e){}
-                }
-
                 for(let i=0; i<25; i++) {
                     let flake = document.createElement('div');
                     flake.className = 'snowflake';
@@ -412,7 +389,6 @@ app.get('/verify', async (req, res) => {
 
                 let turnstileResponseToken = "";
                 function onCaptchaSuccess(token) {
-                    haptic('light');
                     turnstileResponseToken = token;
                     document.getElementById('vBtn').disabled = false;
                 }
@@ -443,11 +419,9 @@ app.get('/verify', async (req, res) => {
                     document.getElementById('successCheck').style.display = 'block';
                     statusTextEl.style.color = '#38bdf8';
                     statusTextEl.textContent = "VERIFIED SUCCESSFULLY!";
-                    haptic('success');
                 }
 
                 async function processVerify() {
-                    haptic('impact');
                     const vBtn = document.getElementById('vBtn');
                     vBtn.disabled = true;
                     vBtn.innerHTML = "⏳ REDIRECTING...";
@@ -462,12 +436,7 @@ app.get('/verify', async (req, res) => {
                             if(data.success && data.url) {
                                 showSuccessAnimation();
                                 setTimeout(() => {
-                                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                                        window.Telegram.WebApp.openLink(data.url);
-                                        window.Telegram.WebApp.close();
-                                    } else {
-                                        window.location.href = data.url;
-                                    }
+                                    window.location.href = data.url;
                                 }, 1200);
                             } else {
                                 window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
@@ -571,7 +540,6 @@ app.get('/gate', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Security Verification</title>
-            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             ${getWinterThemeStyles()}
             <style>
                 .badge {
@@ -609,11 +577,6 @@ app.get('/gate', async (req, res) => {
             </div>
 
             <script>
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-
                 for(let i=0; i<25; i++) {
                     let flake = document.createElement('div');
                     flake.className = 'snowflake';
@@ -745,7 +708,6 @@ app.get('/claim', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Claim Security Gateway</title>
-            <script src="https://telegram.org/js/telegram-web-app.js"></script>
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             ${getWinterThemeStyles()}
         </head>
@@ -787,21 +749,6 @@ app.get('/claim', async (req, res) => {
             </div>
 
             <script>
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-
-                function haptic(type) {
-                    try {
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                            if (type === 'success') window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                            else if (type === 'impact') window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-                            else if (type === 'light') window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-                        }
-                    } catch(e){}
-                }
-
                 for(let i=0; i<25; i++) {
                     let flake = document.createElement('div');
                     flake.className = 'snowflake';
@@ -857,7 +804,6 @@ app.get('/claim', async (req, res) => {
 
                 let claimCaptchaToken = "";
                 function onClaimCaptcha(token) {
-                    haptic('light');
                     claimCaptchaToken = token;
                     document.getElementById('claimBtn').disabled = false;
                 }
@@ -888,11 +834,9 @@ app.get('/claim', async (req, res) => {
                     document.getElementById('successCheck').style.display = 'block';
                     statusTextEl.style.color = '#38bdf8';
                     statusTextEl.textContent = "CLAIM SUCCESSFUL!";
-                    haptic('success');
                 }
 
                 async function executeClaim() {
-                    haptic('impact');
                     const btn = document.getElementById('claimBtn');
                     btn.disabled = true;
                     btn.innerHTML = "⏳ REDIRECTING...";
@@ -907,18 +851,7 @@ app.get('/claim', async (req, res) => {
                             if (data.success && data.url) {
                                 showSuccessAnimation();
                                 setTimeout(() => {
-                                    if (window.Telegram && window.Telegram.WebApp) {
-                                        if (window.Telegram.WebApp.openTelegramLink) {
-                                            window.Telegram.WebApp.openTelegramLink(data.url);
-                                        } else if (window.Telegram.WebApp.openLink) {
-                                            window.Telegram.WebApp.openLink(data.url);
-                                        } else {
-                                            window.location.href = data.url;
-                                        }
-                                        window.Telegram.WebApp.close();
-                                    } else {
-                                        window.location.href = data.url;
-                                    }
+                                    window.location.href = data.url;
                                 }, 1200);
                             } else {
                                 window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
