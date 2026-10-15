@@ -1,7 +1,6 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const axios = require('axios');
-const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,13 +31,6 @@ async function connectDB() {
         }
     }
     return db;
-}
-
-// Cryptographic HMAC Hash Generator
-function generateSecureHash(token, timestamp) {
-    return crypto.createHmac('sha256', POSTBACK_SECRET)
-                 .update(`${token}_${timestamp}`)
-                 .digest('hex');
 }
 
 app.get('/ping', (req, res) => res.status(200).send('SERVER_AWAKE'));
@@ -134,36 +126,27 @@ app.get('/access-denied', (req, res) => {
     res.send(renderAccessDeniedUI(reason));
 });
 
-// Helper Function for Common Winter & Foggy Theme CSS/JS with Animations
 function getWinterThemeStyles() {
     return `
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
             body {
-                background: #090d16;
-                color: #e2e8f0;
+                background: #090d16; color: #e2e8f0;
                 display: flex; flex-direction: column; justify-content: center; align-items: center;
                 min-height: 100vh; overflow: hidden; position: relative;
             }
-            
             .winter-bg {
                 position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                 background: radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.12) 0%, rgba(15, 23, 42, 0.8) 70%, #070a12 100%);
                 z-index: 0;
             }
-
             .fog-container {
                 position: absolute; width: 200%; height: 100%; top: 0; left: -50%;
                 background: url('https://raw.githubusercontent.com/daniel-ice/fog-effect/main/fog.png') repeat-x;
-                background-size: cover; opacity: 0.15;
-                animation: fogMove 30s linear infinite;
+                background-size: cover; opacity: 0.15; animation: fogMove 30s linear infinite;
                 z-index: 1; pointer-events: none;
             }
-            @keyframes fogMove {
-                0% { transform: translateX(0); }
-                100% { transform: translateX(25%); }
-            }
-
+            @keyframes fogMove { 0% { transform: translateX(0); } 100% { transform: translateX(25%); } }
             .snowflake {
                 position: absolute; top: -10px; color: #ffffff; opacity: 0.6;
                 font-size: 1em; animation: fall linear infinite; z-index: 1; pointer-events: none;
@@ -172,95 +155,41 @@ function getWinterThemeStyles() {
                 0% { transform: translateY(-10px) rotate(0deg); opacity: 0.8; }
                 100% { transform: translateY(100vh) rotate(360deg); opacity: 0.2; }
             }
-
             .card {
-                position: relative; z-index: 2;
-                background: rgba(15, 23, 42, 0.7);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+                position: relative; z-index: 2; background: rgba(15, 23, 42, 0.7);
+                border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(16px);
                 border-radius: 28px; width: 330px; padding: 35px 20px 25px 20px;
                 display: flex; flex-direction: column; align-items: center;
-                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(255, 255, 255, 0.03);
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
             }
-
             .timer-container {
                 position: relative; width: 120px; height: 120px;
-                display: flex; justify-content: center; align-items: center;
-                margin-bottom: 20px;
+                display: flex; justify-content: center; align-items: center; margin-bottom: 20px;
             }
             .progress-ring { transform: rotate(-90deg); }
             .progress-ring__circle {
                 stroke-dasharray: 314.159; stroke-dashoffset: 0;
                 transition: stroke-dashoffset 0.1s linear; stroke-linecap: round;
-                filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
             }
-            .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
-            
-            .brand-title { color: #38bdf8; font-size: 1.1rem; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+            .number { position: absolute; font-size: 2.2rem; font-weight: 700; color: #38bdf8; }
+            .brand-title { color: #38bdf8; font-size: 1.1rem; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
             .section-title { color: #ffffff; font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; }
-            .status-text { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; text-align: center; height: 20px; transition: color 0.3s ease; }
-            
+            .status-text { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; text-align: center; height: 20px; }
             .turnstile-container { display: flex; justify-content: center; margin-bottom: 18px; width: 100%; }
             .btn {
-                background: linear-gradient(135deg, #38bdf8, #0284c7);
-                color: #ffffff; border: none; padding: 13px 20px;
-                font-size: 14px; font-weight: 700; border-radius: 20px;
-                cursor: pointer; width: 100%; transition: all 0.3s ease;
-                box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
-                letter-spacing: 0.5px;
+                background: linear-gradient(135deg, #38bdf8, #0284c7); color: #ffffff; border: none;
+                padding: 13px 20px; font-size: 14px; font-weight: 700; border-radius: 20px;
+                cursor: pointer; width: 100%; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
             }
             .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5); }
-            .btn:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
-
-            /* Tick Checkmark Animation CSS */
+            .btn:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; border: 1px solid rgba(255,255,255,0.05); }
             .success-checkmark { display: none; width: 80px; height: 80px; margin: 0 auto 10px; }
             .check-icon {
                 width: 80px; height: 80px; position: relative; border-radius: 50%;
                 box-sizing: content-box; border: 4px solid #38bdf8;
-                box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
             }
-            .check-icon::before {
-                top: 3px; left: -2px; width: 30px; transform-origin: 100% 50%;
-                border-radius: 100px 0 0 100px;
-            }
-            .check-icon::after {
-                top: 0; left: 30px; width: 60px; transform-origin: 0 50%;
-                border-radius: 0 100px 100px 0; animation: rotate-circle 4.25s ease-in;
-            }
-            .check-icon::before, .check-icon::after {
-                content: ''; position: absolute; height: 100%; background: transparent; transform: rotate(-45deg);
-            }
-            .icon-line {
-                height: 5px; background-color: #38bdf8; display: block; border-radius: 2px;
-                position: absolute; z-index: 10;
-            }
-            .line-tip { top: 46px; left: 14px; width: 25px; transform: rotate(45deg); animation: icon-line-tip 0.75s; }
-            .line-long { top: 38px; right: 8px; width: 47px; transform: rotate(-45deg); animation: icon-line-long 0.75s; }
-            
-            @keyframes icon-line-tip {
-                0% { width: 0; left: 1px; top: 19px; }
-                54% { width: 0; left: 1px; top: 19px; }
-                70% { width: 50px; left: -8px; top: 37px; }
-                84% { width: 17px; left: 21px; top: 48px; }
-                100% { width: 25px; left: 14px; top: 46px; }
-            }
-            @keyframes icon-line-long {
-                0% { width: 0; right: 46px; top: 54px; }
-                65% { width: 0; right: 46px; top: 54px; }
-                84% { width: 55px; right: 0px; top: 35px; }
-                100% { width: 47px; right: 8px; top: 38px; }
-            }
-
-            .footer {
-                position: relative; z-index: 2; margin-top: 25px;
-                font-size: 11px; color: #64748b; text-align: center; line-height: 1.6;
-            }
-            .footer-link {
-                color: #38bdf8; text-decoration: none; font-weight: bold; transition: color 0.2s;
-            }
-            .footer-link:hover {
-                color: #7dd3fc; text-decoration: underline;
-            }
+            .footer { position: relative; z-index: 2; margin-top: 25px; font-size: 11px; color: #64748b; text-align: center; line-height: 1.6; }
+            .footer-link { color: #38bdf8; text-decoration: none; font-weight: bold; }
         </style>
     `;
 }
@@ -270,21 +199,13 @@ function getWinterThemeStyles() {
 // ----------------------------------------------------------------------
 app.get('/verify', async (req, res) => {
     const { token } = req.query;
-
-    if (!token) {
-        return res.status(400).send(renderAccessDeniedUI("🚫 Missing or invalid token parameter."));
-    }
+    if (!token) return res.status(400).send(renderAccessDeniedUI("🚫 Missing or invalid token parameter."));
 
     try {
         const cleanToken = token.trim();
-        const tokenDoc = await db.collection('verify_tokens').findOne({ 
-            token: cleanToken, 
-            is_used: false 
-        });
+        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken, is_used: false });
 
-        if (!tokenDoc) {
-            return res.status(403).send(renderAccessDeniedUI("⚡ Token has already been used or link expired."));
-        }
+        if (!tokenDoc) return res.status(403).send(renderAccessDeniedUI("⚡ Token has already been used or link expired."));
 
         res.send(`
         <!DOCTYPE html>
@@ -299,7 +220,6 @@ app.get('/verify', async (req, res) => {
         <body>
             <div class="winter-bg"></div>
             <div class="fog-container"></div>
-
             <div class="card">
                 <div id="timerBox" class="timer-container">
                     <svg class="progress-ring" width="120" height="120">
@@ -308,18 +228,12 @@ app.get('/verify', async (req, res) => {
                     </svg>
                     <div id="countdown" class="number">5</div>
                 </div>
-
                 <div id="successCheck" class="success-checkmark">
-                    <div class="check-icon">
-                        <span class="icon-line line-tip"></span>
-                        <span class="icon-line line-long"></span>
-                    </div>
+                    <div class="check-icon"></div>
                 </div>
-
                 <h1 class="brand-title">Ac Premium</h1>
                 <h2 class="section-title">Security Check</h2>
                 <p id="statusText" class="status-text">Initializing session...</p>
-
                 <div id="verify-form" style="width: 100%;">
                     <div class="turnstile-container">
                         <div class="cf-turnstile" data-theme="dark" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onCaptchaSuccess"></div>
@@ -327,63 +241,34 @@ app.get('/verify', async (req, res) => {
                     <button id="vBtn" class="btn" onclick="processVerify()" disabled>VERIFY & CONTINUE</button>
                 </div>
             </div>
-
             <div class="footer">
                 © 2026 All Rights Reserved<br>
                 Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
             </div>
-
             <script>
-                for(let i=0; i<25; i++) {
-                    let flake = document.createElement('div');
-                    flake.className = 'snowflake';
-                    flake.innerHTML = '❄';
-                    flake.style.left = Math.random() * 100 + 'vw';
-                    flake.style.animationDuration = (Math.random() * 3 + 3) + 's';
-                    flake.style.fontSize = (Math.random() * 10 + 10) + 'px';
-                    document.body.appendChild(flake);
-                }
-
                 const circle = document.getElementById('ring');
                 const countdownEl = document.getElementById('countdown');
                 const statusTextEl = document.getElementById('statusText');
-
                 const radius = circle.r.baseVal.value;
                 const circumference = 2 * Math.PI * radius;
                 circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
 
                 function setProgress(percent) {
-                    const offset = circumference - (percent / 100) * circumference;
-                    circle.style.strokeDashoffset = offset;
+                    circle.style.strokeDashoffset = circumference - (percent / 100) * circumference;
                 }
                 setProgress(100);
 
-                const countMsgs = {
-                    5: "Initializing secure session...",
-                    4: "Encrypting parameters...",
-                    3: "Checking Cloudflare Turnstile...",
-                    2: "Verifying system integrity...",
-                    1: "Almost ready, tap button below!"
-                };
-
-                let totalDuration = 5000;
-                let timeRemaining = totalDuration;
-
+                let timeRemaining = 5000;
                 let timer = setInterval(() => {
                     timeRemaining -= 100;
-                    const displaySeconds = Math.ceil(timeRemaining / 1000);
-                    
+                    let secs = Math.ceil(timeRemaining / 1000);
                     if (timeRemaining >= 0) {
-                        countdownEl.textContent = displaySeconds;
-                        setProgress((timeRemaining / totalDuration) * 100);
-                        if (countMsgs[displaySeconds]) {
-                            statusTextEl.textContent = countMsgs[displaySeconds];
-                        }
+                        countdownEl.textContent = secs;
+                        setProgress((timeRemaining / 5000) * 100);
                     } else {
                         clearInterval(timer);
                         countdownEl.textContent = "0";
                         setProgress(0);
-                        statusTextEl.textContent = "Complete Security Check";
                     }
                 }, 100);
 
@@ -393,59 +278,22 @@ app.get('/verify', async (req, res) => {
                     document.getElementById('vBtn').disabled = false;
                 }
 
-                function startSecondaryCountdown() {
-                    let duration = 5000;
-                    let remaining = duration;
-                    countdownEl.textContent = "5";
-                    setProgress(100);
-                    statusTextEl.textContent = "Redirecting, Please Wait...";
-
-                    let reTimer = setInterval(() => {
-                        remaining -= 100;
-                        const secs = Math.ceil(remaining / 1000);
-                        if (remaining >= 0) {
-                            countdownEl.textContent = secs;
-                            setProgress((remaining / duration) * 100);
-                        } else {
-                            clearInterval(reTimer);
-                            countdownEl.textContent = "0";
-                            setProgress(0);
-                        }
-                    }, 100);
-                }
-
-                function showSuccessAnimation() {
-                    document.getElementById('timerBox').style.display = 'none';
-                    document.getElementById('successCheck').style.display = 'block';
-                    statusTextEl.style.color = '#38bdf8';
-                    statusTextEl.textContent = "VERIFIED SUCCESSFULLY!";
-                }
-
                 async function processVerify() {
                     const vBtn = document.getElementById('vBtn');
                     vBtn.disabled = true;
                     vBtn.innerHTML = "⏳ REDIRECTING...";
 
-                    startSecondaryCountdown();
-
                     try {
                         const res = await fetch(\`/api/process-token?token=${cleanToken}&cf_token=\${encodeURIComponent(turnstileResponseToken)}\`);
                         const data = await res.json();
                         
-                        setTimeout(() => {
-                            if(data.success && data.url) {
-                                showSuccessAnimation();
-                                setTimeout(() => {
-                                    window.location.href = data.url;
-                                }, 1200);
-                            } else {
-                                window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
-                            }
-                        }, 4000);
+                        if(data.success && data.url) {
+                            window.location.href = data.url;
+                        } else {
+                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Verification Failed")}\`;
+                        }
                     } catch(e) {
-                        setTimeout(() => {
-                            window.location.href = "/access-denied?reason=Network Error";
-                        }, 4000);
+                        window.location.href = "/access-denied?reason=Network Error";
                     }
                 }
             </script>
@@ -453,17 +301,15 @@ app.get('/verify', async (req, res) => {
         </html>
         `);
     } catch (e) {
-        console.error("Verification Route Error:", e);
         res.status(500).send("Internal Server Error");
     }
 });
 
 // ----------------------------------------------------------------------
-// 2️⃣ STEP 2: GENERATE SHORTLINK & INIT TRACKING
+// 2️⃣ STEP 2: GENERATE SHORTLINK (Directly returns Bot URL on completion)
 // ----------------------------------------------------------------------
 app.get('/api/process-token', async (req, res) => {
     const { token, cf_token } = req.query;
-
     if (!token || !cf_token) return res.json({ success: false, message: "Missing parameters" });
 
     try {
@@ -480,33 +326,37 @@ app.get('/api/process-token', async (req, res) => {
         const cleanToken = token.trim();
         const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken, is_used: false });
 
-        if (!tokenDoc) {
-            return res.json({ success: false, message: "Token already used or expired!" });
+        if (!tokenDoc) return res.json({ success: false, message: "Token already used or expired!" });
+
+        // सीधा बॉट का लिंक तैयार करें (जहाँ यूजर शॉर्टलिंक पार करके सीधा जाएगा)
+        const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
+        let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
+        const botUsername = rawBotUsername.replace(/^@/, '');
+
+        // यदि शॉर्टलिंक का इस्तेमाल करना है तो यहाँ शॉर्टलिंक का यूआरएल सेट रहेगा जो यूजर को शॉर्टसाइट पर ले जाएगा
+        if (settings && settings.shortlink_url && settings.shortlink_api) {
+            // जब शॉर्टलिंक पूरा होगा, तब पोस्टबैक पर आपका बॉट मार्क हो जाएगा
+            const hostUrl = req.protocol + '://' + req.get('host');
+            const targetRedirectUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
+            
+            const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetRedirectUrl)}&alias=${cleanToken}`;
+            
+            const response = await axios.get(shortenerApiUrl);
+            const shortUrl = response.data.shortenedUrl || response.data.url;
+
+            if (shortUrl) {
+                return res.json({ success: true, url: shortUrl });
+            }
         }
 
+        // अगर शॉर्टलिंक कॉन्फ़िगर नहीं है, तो सीधे बॉट पर भेजें
         await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { generated_at: Date.now(), is_completed: false, gate_passed: false } }
+            { $set: { is_used: true, claimed_at: Date.now() } }
         );
 
-        const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
-        if (!settings || !settings.shortlink_url || !settings.shortlink_api) {
-            return res.json({ success: false, message: "Shortener configuration missing." });
-        }
+        return res.json({ success: true, url: `https://t.me/${botUsername}?start=verify_${cleanToken}` });
 
-        const hostUrl = req.protocol + '://' + req.get('host');
-        const targetProxyUrl = `${hostUrl}/gate?token=${cleanToken}`;
-
-        const shortenerApiUrl = `https://${settings.shortlink_url}/api?api=${settings.shortlink_api}&url=${encodeURIComponent(targetProxyUrl)}&alias=${cleanToken}`;
-        
-        const response = await axios.get(shortenerApiUrl);
-        const shortUrl = response.data.shortenedUrl || response.data.url;
-
-        if (shortUrl) {
-            return res.json({ success: true, url: shortUrl });
-        } else {
-            return res.json({ success: false, message: "Failed to generate shortener link." });
-        }
     } catch (err) {
         console.error("API Error:", err);
         return res.json({ success: false, message: "Server Verification Error." });
@@ -514,425 +364,7 @@ app.get('/api/process-token', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 3️⃣ STEP 3: INTERMEDIATE ANTI-BYPASS GATE (/gate)
-// ----------------------------------------------------------------------
-app.get('/gate', async (req, res) => {
-    const { token } = req.query;
-
-    if (!token) return res.status(400).send(renderAccessDeniedUI("🚫 Missing token parameter."));
-
-    try {
-        const cleanToken = token.trim();
-        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
-
-        if (!tokenDoc) {
-            return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired verification token."));
-        }
-
-        if (tokenDoc.is_used) {
-            return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
-        }
-
-        res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Security Verification</title>
-            ${getWinterThemeStyles()}
-            <style>
-                .badge {
-                    background-color: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);
-                    padding: 8px 18px; border-radius: 20px; font-size: 0.85rem;
-                    font-weight: 600; display: flex; align-items: center; gap: 6px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="winter-bg"></div>
-            <div class="fog-container"></div>
-
-            <div class="card">
-                <div class="timer-container">
-                    <svg class="progress-ring" width="120" height="120">
-                        <circle stroke="rgba(56, 189, 248, 0.15)" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
-                        <circle id="ring" class="progress-ring__circle" stroke="#38bdf8" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
-                    </svg>
-                    <div id="countdown" class="number">5</div>
-                </div>
-
-                <h1 class="brand-title">Ac Premium</h1>
-                <h2 class="section-title">Security Verification</h2>
-                <p id="status-text" class="status-text">Verifying human...</p>
-
-                <div class="badge">
-                    <span>⚡</span> Ac Premium
-                </div>
-            </div>
-
-            <div class="footer">
-                © 2026 All Rights Reserved<br>
-                Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
-            </div>
-
-            <script>
-                for(let i=0; i<25; i++) {
-                    let flake = document.createElement('div');
-                    flake.className = 'snowflake';
-                    flake.innerHTML = '❄';
-                    flake.style.left = Math.random() * 100 + 'vw';
-                    flake.style.animationDuration = (Math.random() * 3 + 3) + 's';
-                    flake.style.fontSize = (Math.random() * 10 + 10) + 'px';
-                    document.body.appendChild(flake);
-                }
-
-                const circle = document.getElementById('ring');
-                const countdownEl = document.getElementById('countdown');
-                const statusTextEl = document.getElementById('status-text');
-
-                const radius = circle.r.baseVal.value;
-                const circumference = 2 * Math.PI * radius;
-                circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
-
-                const totalDuration = 5000;
-                let timeRemaining = totalDuration;
-
-                const countMsgs = {
-                    5: "Validating Gate Request...",
-                    4: "Connecting Security Nodes...",
-                    3: "Verifying Anti-Bypass Keys...",
-                    2: "Securing Token Payload...",
-                    1: "Redirecting to Final Claim..."
-                };
-
-                function setProgress(percent) {
-                    const offset = circumference - (percent / 100) * circumference;
-                    circle.style.strokeDashoffset = offset;
-                }
-                setProgress(100);
-
-                const timer = setInterval(() => {
-                    timeRemaining -= 100;
-                    const displaySeconds = Math.ceil(timeRemaining / 1000);
-                    
-                    if (timeRemaining >= 0) {
-                        countdownEl.textContent = displaySeconds;
-                        setProgress((timeRemaining / totalDuration) * 100);
-                        if (countMsgs[displaySeconds]) {
-                            statusTextEl.textContent = countMsgs[displaySeconds];
-                        }
-                    } else {
-                        clearInterval(timer);
-                        countdownEl.textContent = "0";
-                        setProgress(0);
-                        statusTextEl.textContent = "Redirecting...";
-                        passGate();
-                    }
-                }, 100);
-
-                async function passGate() {
-                    try {
-                        const res = await fetch(\`/api/pass-gate?token=${cleanToken}\`);
-                        const data = await res.json();
-                        if (data.success) {
-                            window.location.href = \`/claim?token=${cleanToken}&hash=\${data.hash}\`;
-                        } else {
-                            window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Check Failed")}\`;
-                        }
-                    } catch(e) {
-                        window.location.href = "/access-denied?reason=Gate Connection Error";
-                    }
-                }
-            </script>
-        </body>
-        </html>
-        `);
-    } catch (err) {
-        console.error("Gate Route Error:", err);
-        return res.status(500).send(renderAccessDeniedUI("Gate Security Check Error."));
-    }
-});
-
-// Secure Pass Gate API
-app.get('/api/pass-gate', async (req, res) => {
-    const { token } = req.query;
-    if (!token) return res.json({ success: false, message: "Missing token." });
-
-    try {
-        const cleanToken = token.trim();
-        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
-
-        if (!tokenDoc || tokenDoc.is_used) {
-            return res.json({ success: false, message: "Invalid or used token." });
-        }
-
-        const timestamp = Date.now();
-        const hash = generateSecureHash(cleanToken, timestamp);
-
-        await db.collection('verify_tokens').updateOne(
-            { token: cleanToken },
-            { $set: { gate_passed: true, gate_hash: hash, gate_time: timestamp } }
-        );
-
-        return res.json({ success: true, hash });
-    } catch(e) {
-        return res.json({ success: false, message: "Gate pass failed." });
-    }
-});
-
-// ----------------------------------------------------------------------
-// 4️⃣ STEP 4: CLAIM PAGE (/claim)
-// ----------------------------------------------------------------------
-app.get('/claim', async (req, res) => {
-    const { token, hash } = req.query;
-
-    if (!token || !hash) return res.status(400).send(renderAccessDeniedUI("🚫 Direct access strictly blocked. Complete verification process first."));
-
-    try {
-        const cleanToken = token.trim();
-        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
-
-        if (!tokenDoc) return res.status(403).send(renderAccessDeniedUI("⚡ Invalid or expired token."));
-        if (tokenDoc.is_used) return res.status(403).send(renderAccessDeniedUI("⚠️ Token has already been claimed."));
-
-        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
-        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
-            return res.status(403).send(renderAccessDeniedUI("🛡️ BYPASS DETECTED: Invalid Security Hash."));
-        }
-
-        res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Claim Security Gateway</title>
-            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-            ${getWinterThemeStyles()}
-        </head>
-        <body>
-            <div class="winter-bg"></div>
-            <div class="fog-container"></div>
-
-            <div class="card">
-                <div id="timerBox" class="timer-container">
-                    <svg class="progress-ring" width="120" height="120">
-                        <circle stroke="rgba(56, 189, 248, 0.15)" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
-                        <circle id="ring" class="progress-ring__circle" stroke="#38bdf8" stroke-width="6" fill="transparent" r="50" cx="60" cy="60"/>
-                    </svg>
-                    <div id="countdown" class="number">5</div>
-                </div>
-
-                <div id="successCheck" class="success-checkmark">
-                    <div class="check-icon">
-                        <span class="icon-line line-tip"></span>
-                        <span class="icon-line line-long"></span>
-                    </div>
-                </div>
-
-                <h1 class="brand-title">Ac Premium</h1>
-                <h2 class="section-title">Final Check</h2>
-                <p id="statusText" class="status-text">Initializing session...</p>
-
-                <div style="width: 100%;">
-                    <div class="turnstile-container">
-                        <div class="cf-turnstile" data-theme="dark" data-sitekey="${TURNSTILE_SITE_KEY}" data-callback="onClaimCaptcha"></div>
-                    </div>
-                    <button id="claimBtn" class="btn" onclick="executeClaim()" disabled>🎁 CLAIM YOUR TOKEN</button>
-                </div>
-            </div>
-
-            <div class="footer">
-                © 2026 All Rights Reserved<br>
-                Powered by <a href="https://t.me/pratilipifm0900" target="_blank" class="footer-link">GW KaLu</a>
-            </div>
-
-            <script>
-                for(let i=0; i<25; i++) {
-                    let flake = document.createElement('div');
-                    flake.className = 'snowflake';
-                    flake.innerHTML = '❄';
-                    flake.style.left = Math.random() * 100 + 'vw';
-                    flake.style.animationDuration = (Math.random() * 3 + 3) + 's';
-                    flake.style.fontSize = (Math.random() * 10 + 10) + 'px';
-                    document.body.appendChild(flake);
-                }
-
-                const circle = document.getElementById('ring');
-                const countdownEl = document.getElementById('countdown');
-                const statusTextEl = document.getElementById('statusText');
-
-                const radius = circle.r.baseVal.value;
-                const circumference = 2 * Math.PI * radius;
-                circle.style.strokeDasharray = \`\${circumference} \${circumference}\`;
-
-                const countMsgs = {
-                    5: "Preparing reward token...",
-                    4: "Verifying Captcha Token...",
-                    3: "Authorizing Telegram Protocol...",
-                    2: "Finalizing Token Release...",
-                    1: "Ready to Claim!"
-                };
-
-                let totalDuration = 5000;
-                let timeRemaining = totalDuration;
-
-                function setProgress(percent) {
-                    const offset = circumference - (percent / 100) * circumference;
-                    circle.style.strokeDashoffset = offset;
-                }
-                setProgress(100);
-
-                let timer = setInterval(() => {
-                    timeRemaining -= 100;
-                    const displaySeconds = Math.ceil(timeRemaining / 1000);
-                    
-                    if (timeRemaining >= 0) {
-                        countdownEl.textContent = displaySeconds;
-                        setProgress((timeRemaining / totalDuration) * 100);
-                        if (countMsgs[displaySeconds]) {
-                            statusTextEl.textContent = countMsgs[displaySeconds];
-                        }
-                    } else {
-                        clearInterval(timer);
-                        countdownEl.textContent = "0";
-                        setProgress(0);
-                        statusTextEl.textContent = "Click button below";
-                    }
-                }, 100);
-
-                let claimCaptchaToken = "";
-                function onClaimCaptcha(token) {
-                    claimCaptchaToken = token;
-                    document.getElementById('claimBtn').disabled = false;
-                }
-
-                function startSecondaryCountdown() {
-                    let duration = 5000;
-                    let remaining = duration;
-                    countdownEl.textContent = "5";
-                    setProgress(100);
-                    statusTextEl.textContent = "Finalizing Claim, Please Wait...";
-
-                    let reTimer = setInterval(() => {
-                        remaining -= 100;
-                        const secs = Math.ceil(remaining / 1000);
-                        if (remaining >= 0) {
-                            countdownEl.textContent = secs;
-                            setProgress((remaining / duration) * 100);
-                        } else {
-                            clearInterval(reTimer);
-                            countdownEl.textContent = "0";
-                            setProgress(0);
-                        }
-                    }, 100);
-                }
-
-                function showSuccessAnimation() {
-                    document.getElementById('timerBox').style.display = 'none';
-                    document.getElementById('successCheck').style.display = 'block';
-                    statusTextEl.style.color = '#38bdf8';
-                    statusTextEl.textContent = "CLAIM SUCCESSFUL!";
-                }
-
-                async function executeClaim() {
-                    const btn = document.getElementById('claimBtn');
-                    btn.disabled = true;
-                    btn.innerHTML = "⏳ REDIRECTING...";
-
-                    startSecondaryCountdown();
-
-                    try {
-                        const res = await fetch(\`/api/execute-claim?token=${cleanToken}&hash=${hash}&cf_token=\${encodeURIComponent(claimCaptchaToken)}\`);
-                        const data = await res.json();
-
-                        setTimeout(() => {
-                            if (data.success && data.url) {
-                                showSuccessAnimation();
-                                setTimeout(() => {
-                                    window.location.href = data.url;
-                                }, 1200);
-                            } else {
-                                window.location.href = \`/access-denied?reason=\${encodeURIComponent(data.message || "Security Verification Failed")}\`;
-                            }
-                        }, 4000);
-                    } catch(e) {
-                        setTimeout(() => {
-                            window.location.href = "/access-denied?reason=Network verification error";
-                        }, 4000);
-                    }
-                }
-            </script>
-        </body>
-        </html>
-        `);
-
-    } catch (err) {
-        console.error("Claim Route Error:", err);
-        return res.status(500).send(renderAccessDeniedUI("Internal Security Check Error."));
-    }
-});
-
-// ----------------------------------------------------------------------
-// 5️⃣ STEP 5: FINAL BACKEND CLAIM CHECK
-// ----------------------------------------------------------------------
-app.get('/api/execute-claim', async (req, res) => {
-    const { token, hash, cf_token } = req.query;
-
-    if (!token || !hash || !cf_token) return res.json({ success: false, message: "Token/Hash/Captcha missing." });
-
-    try {
-        const cleanToken = token.trim();
-        const tokenDoc = await db.collection('verify_tokens').findOne({ token: cleanToken });
-
-        if (!tokenDoc || tokenDoc.is_used) {
-            return res.json({ success: false, message: "Invalid or already used token." });
-        }
-
-        if (REQUIRE_POSTBACK && !tokenDoc.is_completed) {
-            return res.json({ 
-                success: false, 
-                message: "🚫 BYPASS DETECTED: Shortlink task was skipped or not completed via Official Site!" 
-            });
-        }
-
-        const expectedHash = generateSecureHash(cleanToken, tokenDoc.gate_time);
-        if (!tokenDoc.gate_passed || tokenDoc.gate_hash !== hash || hash !== expectedHash) {
-            return res.json({ success: false, message: "BYPASS DETECTED! Security Hash Mismatch." });
-        }
-
-        const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-        const cfResponse = await axios.post(verifyUrl, new URLSearchParams({
-            secret: TURNSTILE_SECRET_KEY,
-            response: cf_token
-        }));
-
-        if (!cfResponse.data.success) {
-            return res.json({ success: false, message: "Security Captcha verification failed!" });
-        }
-
-        await db.collection('verify_tokens').updateOne(
-            { token: cleanToken },
-            { $set: { is_used: true, claimed_at: Date.now() } }
-        );
-
-        const settings = await db.collection('settings').findOne({ _id: "bot_settings" });
-        let rawBotUsername = (settings && settings.bot_username) || "SmartfilestorebyAcbot";
-        const botUsername = rawBotUsername.replace(/^@/, '');
-
-        const targetTelegramUrl = `https://t.me/${botUsername}?start=verify_${cleanToken}`;
-
-        return res.json({ success: true, url: targetTelegramUrl });
-
-    } catch (err) {
-        console.error("Execute Claim Error:", err);
-        return res.json({ success: false, message: "Server execution error." });
-    }
-});
-
-// ----------------------------------------------------------------------
-// 6️⃣ STEP 6: POSTBACK RECEIVER (Webhook)
+// 3️⃣ STEP 3: POSTBACK RECEIVER (Webhook से टोकन वैलिडेट करना)
 // ----------------------------------------------------------------------
 app.get('/api/postback', async (req, res) => {
     const { token, secret } = req.query;
@@ -944,15 +376,13 @@ app.get('/api/postback', async (req, res) => {
         const cleanToken = token.trim();
         const updateResult = await db.collection('verify_tokens').updateOne(
             { token: cleanToken },
-            { $set: { is_completed: true, postback_at: Date.now() } }
+            { $set: { is_used: true, is_completed: true, postback_at: Date.now() } }
         );
 
         if (updateResult.matchedCount === 0) return res.status(404).send("Token not found");
 
-        console.log(`✅ Webhook Received Successfully for Token: ${cleanToken}`);
         return res.status(200).send("OK");
     } catch (err) {
-        console.error("Postback Processing Error:", err);
         return res.status(500).send("Internal Server Error");
     }
 });
